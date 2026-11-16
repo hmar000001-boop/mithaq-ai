@@ -4,16 +4,26 @@
 # Android's system_server and Package Manager during APK installation.
 set -Eeuo pipefail
 
-if [[ "$#" -ne 5 ]]; then
-  echo "Usage: $0 <main.apk> <companion.apk> <attacker.apk> <androidTest.apk> <diagnostics-dir>" >&2
+# ReactiveCircus/android-emulator-runner parses its `script:` input into
+# independent one-line shell commands. CI therefore invokes this helper as a
+# single line with no positional arguments. Defaults are rooted at the GitHub
+# workspace; explicit five-argument mode remains available for local debugging.
+if [[ "$#" -eq 0 ]]; then
+  MAIN_APK="${MITHAQ_MAIN_APK:-app/build/outputs/apk/debug/app-debug.apk}"
+  COMPANION_APK="${MITHAQ_COMPANION_APK:-network-companion/build/outputs/apk/debug/network-companion-debug.apk}"
+  ATTACKER_APK="${MITHAQ_ATTACKER_APK:-unauthorized-probe/build/outputs/apk/debug/unauthorized-probe-debug.apk}"
+  ANDROID_TEST_APK="${MITHAQ_ANDROID_TEST_APK:-app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk}"
+  DIAGNOSTICS_DIR="${MITHAQ_DIAGNOSTICS_DIR:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/mithaq-emulator-diagnostics}"
+elif [[ "$#" -eq 5 ]]; then
+  MAIN_APK="$1"
+  COMPANION_APK="$2"
+  ATTACKER_APK="$3"
+  ANDROID_TEST_APK="$4"
+  DIAGNOSTICS_DIR="$5"
+else
+  echo "Usage: $0 [<main.apk> <companion.apk> <attacker.apk> <androidTest.apk> <diagnostics-dir>]" >&2
   exit 64
 fi
-
-MAIN_APK="$1"
-COMPANION_APK="$2"
-ATTACKER_APK="$3"
-ANDROID_TEST_APK="$4"
-DIAGNOSTICS_DIR="$5"
 mkdir -p "$DIAGNOSTICS_DIR"
 
 capture_diagnostics() {

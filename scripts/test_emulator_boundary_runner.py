@@ -90,10 +90,15 @@ def main() -> int:
                 "PATH": f"{bin_dir}:{env.get('PATH', '')}",
                 "MITHAQ_MOCK_ADB_STATE": str(state),
                 "MITHAQ_MOCK_FAIL_FIRST_INSTALL": "1",
+                "MITHAQ_MAIN_APK": str(apk_dir / "main.apk"),
+                "MITHAQ_COMPANION_APK": str(apk_dir / "companion.apk"),
+                "MITHAQ_ATTACKER_APK": str(apk_dir / "attacker.apk"),
+                "MITHAQ_ANDROID_TEST_APK": str(apk_dir / "androidTest.apk"),
+                "MITHAQ_DIAGNOSTICS_DIR": str(diagnostics),
             }
         )
         result = subprocess.run(
-            ["bash", str(RUNNER), *apks, str(diagnostics)],
+            ["bash", str(RUNNER)],
             cwd=ROOT,
             env=env,
             text=True,
@@ -115,7 +120,7 @@ def main() -> int:
             print("Mock run did not create boundary summary", file=sys.stderr)
             return 1
 
-    print("Emulator boundary runner mock test: PASS (including bounded Broken pipe retry)")
+    print("Emulator boundary runner mock test: PASS (zero-argument CI invocation and bounded Broken pipe retry)")
     return 0
 
 

@@ -1,8 +1,8 @@
-# Mithaq Phase 0 — Checkpoint 0.1.5
+# Mithaq Phase 0 — Checkpoint 0.1.6
 
 **Date:** 16 November 2026  
 **Baseline:** Product specification r1.5, amended for the selected brand name Mithaq  
-**Checkpoint type:** Repository/security-boundary foundation; emulator Package Manager install reliability correction  
+**Checkpoint type:** Repository/security-boundary foundation; emulator runner script-input parsing correction  
 **Status:** Source prepared; hosted Gradle/APK/emulator validation pending
 
 ## 1. Product decisions frozen for this checkpoint
@@ -32,7 +32,7 @@
 | Negative Binder test | Separate probe APK signed with an ephemeral, unrelated CI certificate attempts to bind and must be denied | `unauthorized-probe/` + emulator workflow (hosted run pending) |
 | Isolation test | Checks isolated UID differs, cannot read host-private marker, lacks Internet permission | `BoundaryInstrumentedTest` |
 | Build checks | Python manifest and product invariants, including explicit removal of AndroidX Core's API<33 receiver-permission fallback | `scripts/` |
-| CI | Unit tests, lint, both debug APKs, prebuilt instrumentation APK, Package Manager readiness gate, direct AndroidJUnitRunner execution, artifact uploads | `.github/workflows/ci.yml`, `scripts/run_emulator_boundary_tests.sh` |
+| CI | Unit tests, lint, both debug APKs, prebuilt instrumentation APK, Package Manager readiness gate, direct AndroidJUnitRunner execution, artifact uploads; emulator action invokes its helper as one physical script command | `.github/workflows/ci.yml`, `scripts/run_emulator_boundary_tests.sh` |
 | Release publishing | Signed APK/AAB and checksums uploaded to GitHub Release on `v*.*.*` tags | `publish-release` job |
 
 ## 3. Deliberately not implemented
@@ -69,7 +69,7 @@ A Gradle Wrapper JAR could not be retrieved in this build environment. No fake o
 | Python workflow pin audit | PASS | `scripts/check_workflow_pins.py`; all third-party action refs use full commit SHAs |
 | Python syntax compile | PASS | All repository Python scripts compile with `py_compile` |
 | CI YAML syntax and structural scan | PASS | Parsed locally; GitHub-hosted execution remains pending |
-| Emulator helper control-flow test | PASS | `scripts/test_emulator_boundary_runner.py` runs the helper with fake ADB and injects a transient Package Manager `Broken pipe`; bounded retry and test flow pass |
+| Emulator helper control-flow test | PASS | `scripts/test_emulator_boundary_runner.py` invokes the helper with zero arguments, as CI does, uses fake ADB and injects a transient Package Manager `Broken pipe`; bounded retry and test flow pass |
 | SDK package invariant | PASS | All three workflow jobs request the exact `platforms;android-37.0` package and verify its `android.jar`; all Android modules pin minor API 0 |
 | Gradle configuration and debug APK assembly | PASS (hosted) | The 16 November run completed with `BUILD SUCCESSFUL`; main, companion and attacker APK assembly completed. The instrumentation APK is now prebuilt in the new pre-emulator step. |
 | Unit tests and lint | PASS (hosted prerequisite job) | The emulator job ran only after `build-test` completed successfully, which requires unit tests, lint, APK assembly and the packaged permission audit. |
@@ -148,3 +148,12 @@ The reported `/sdcard/Android/media/com.mithaq.app.debug/additional_test_output`
 - Source test code validates companion metadata, signature permission grant, matching signing certificates, isolated service flags, unique isolated binding and terminal callbacks.
 - Static checks and archive integrity: to be rerun before delivery.
 - Gradle compilation, Android manifest merge, Binder callbacks, UID separation, private-file denial and different-signer denial: pending the next hosted Android 36 emulator run. This checkpoint is a source-level correction and diagnostic improvement, not a claim that emulator tests have passed.
+
+
+## 0.1.6 — ReactiveCircus script parser compatibility
+
+The first 0.1.5 hosted rerun exited with code 64 before the helper reached Android boot checks. The helper reported its usage because it received zero positional arguments. The pinned `ReactiveCircus/android-emulator-runner` action splits its `script:` input on physical newlines and executes each resulting line as a separate `sh -c` command. Consequently, YAML's multi-line Bash command with backslash continuations did not behave like a normal shell script.
+
+Checkpoint 0.1.6 changes the action's `script:` input to the single physical command `bash scripts/run_emulator_boundary_tests.sh`. The helper now supports zero arguments and derives the four APK paths from the repository workspace plus its diagnostics directory from `RUNNER_TEMP`; its five-argument mode remains available for local/manual use. The mock-ADB test now executes the zero-argument path, and the invariant checker rejects any regression to a multiline command in this action input.
+
+This resolves the observed usage/exit-64 failure at source level. It does not prove Android boot, package installation, Binder connection, isolated UID or attacker denial: those remain pending the next hosted emulator run.

@@ -162,13 +162,10 @@ jobs:
           profile: pixel_6
           emulator-boot-timeout: 600
           disable-animations: true
-          script: |
-            bash scripts/run_emulator_boundary_tests.sh \
-              app/build/outputs/apk/debug/app-debug.apk \
-              network-companion/build/outputs/apk/debug/network-companion-debug.apk \
-              unauthorized-probe/build/outputs/apk/debug/unauthorized-probe-debug.apk \
-              app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
-              "$RUNNER_TEMP/mithaq-emulator-diagnostics"
+          # The pinned action splits script input into independent lines.
+          # Keep this one command on one physical line; the helper resolves
+          # default APK paths and RUNNER_TEMP internally.
+          script: bash scripts/run_emulator_boundary_tests.sh
 
       - name: Upload instrumentation reports
         if: always()

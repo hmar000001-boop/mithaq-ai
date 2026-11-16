@@ -57,3 +57,12 @@ AndroidX Core contributes a signature permission used only by its pre-API-33 `Co
 
 Gradle builds the APKs before emulator launch; the emulator runtime helper does not invoke Gradle. One bounded Package Manager recovery reboot is permitted. Unknown installation errors and repeated failures remain fatal.
 
+
+
+## Emulator action input parsing (checkpoint 0.1.6)
+
+| Check | Method | Required result |
+|---|---|---|
+| Action script parsing | Inspect the pinned action's `parseScript()` behavior and statically inspect the workflow `script:` input | One physical command only; do not use YAML multiline block or shell line continuations |
+| CI helper invocation | Run `scripts/run_emulator_boundary_tests.sh` with zero positional arguments and mocked APK/diagnostics paths supplied through environment variables | Helper receives all default paths, then executes the full mocked install/instrumentation/attacker-denial path |
+| Hosted boundary proof | Actual API 36 emulator run | Boot, Package Manager readiness, APK installation, both Binder instrumentation tests and separately signed attacker denial pass |

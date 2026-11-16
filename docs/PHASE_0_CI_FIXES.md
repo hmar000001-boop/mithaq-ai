@@ -122,3 +122,26 @@ This occurs before the instrumentation tests start. The `Unable to strip libandr
 ### Validation boundary
 
 Static script/workflow/manifest/ZIP checks and the fake-ADB control-flow test validate the helper and its bounded retry, but only the next hosted emulator run can establish whether it resolves the actual emulator `Broken pipe` condition. The previous log does not prove the emulator OOMed or that `system_server` crashed; resource contention is treated as a plausible contributing condition, not a confirmed root cause.
+
+
+## 17. Checkpoint 0.1.6 — Emulator action split the helper invocation into separate lines
+
+### Hosted symptom
+
+The 0.1.5 workflow started the emulator and then immediately printed the helper's usage text, exiting 64. No ADB boot check or APK installation ran.
+
+### Root cause
+
+The exact pinned `ReactiveCircus/android-emulator-runner` source implements `parseScript()` by trimming the `script:` input, splitting it on `\n`/`\r`, trimming each line, and running every nonempty line as its own `sh -c` process. A Bash multiline command using trailing backslashes is therefore not a single command in this action. The first line invoked `bash scripts/run_emulator_boundary_tests.sh` without arguments, and the helper correctly returned usage code 64.
+
+### Change
+
+- Changed the action input to one physical line: `script: bash scripts/run_emulator_boundary_tests.sh`.
+- Added zero-argument defaults in the helper for the main, companion, attacker and androidTest APK paths and the `$RUNNER_TEMP` diagnostics directory. Five-argument mode remains supported for local use.
+- Changed the fake-ADB regression test to invoke the helper with zero arguments and inject APK/diagnostics paths through environment variables, matching CI behavior.
+- Added a project invariant that requires the emulator action's script input to remain a single physical command.
+- Added ADR-0009 and updated the Phase 0 checkpoint and README.
+
+### Validation boundary
+
+The source parser behavior is verified against the exact action commit pinned in the workflow. Static checks and the zero-argument fake-ADB regression test validate this correction. The next hosted run must still prove the emulator and Binder boundaries; the current failure occurred before those tests.

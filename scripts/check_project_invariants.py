@@ -76,7 +76,15 @@ if workflow.index(prebuild_marker) > workflow.index(emulator_marker):
 prebuild_section = workflow[workflow.index(prebuild_marker):workflow.index(emulator_marker)]
 if ":app:assembleDebugAndroidTest" not in prebuild_section:
     fail("Instrumentation APK must be prebuilt before emulator startup")
+# ReactiveCircus/android-emulator-runner@a421e438 parses its script input into
+# independent single-line commands. A YAML literal/folded block with Bash\
+# continuations is therefore unsafe: only the first line receives the arguments.
+script_input = re.search(r"(?m)^\s+script: (.+)$", workflow)
+if not script_input or script_input.group(1).strip() != "bash scripts/run_emulator_boundary_tests.sh":
+    fail("Emulator action script must be one physical command invoking the helper with its default paths")
 emulator_script = (ROOT / "scripts/run_emulator_boundary_tests.sh").read_text()
+if 'if [[ "$#" -eq 0 ]]; then' not in emulator_script:
+    fail("Emulator helper must support the zero-argument CI invocation")
 if "gradle " in emulator_script:
     fail("Emulator runtime helper must not invoke Gradle while the emulator is running")
 for required in (
