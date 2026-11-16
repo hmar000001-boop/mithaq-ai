@@ -121,3 +121,29 @@ Phase 0 remains open until:
 - R10 — AndroidX Core source: its receiver-registration compatibility permission is only checked below API 33; API 33+ delegates to the platform overload: https://android.googlesource.com/platform/frameworks/support/+/4d0b56080497b79e6ac3d1b3b87f1029edf9c3c7/core/core/src/main/java/androidx/core/content/ContextCompat.java
 - R11 — Android security guide: the generated receiver permission is required when `minSdk < 33`, not when the supported baseline is API 35: https://developer.android.com/agents/skills/security/android-intent-security/skill
 - R8 — SDK Manager channel options (0 stable, 1 beta, 2 dev, 3 canary): https://developer.android.com/tools/sdkmanager
+
+## Binder connection failure investigation and correction (checkpoint 0.1.4)
+
+**Reported run:** 2026-11-16T20:44Z (after APK permission audit passed)  
+**Affected tests:** isolated inference probe and signed network companion Binder round trip.
+
+### Findings
+
+The hosted APKs compiled and packaged, and the strict packaged-permission audit advanced beyond its previous failure. Both instrumentation tests then timed out while waiting for `ServiceConnection.onServiceConnected`. The separate companion package was not declared in the main app's `<queries>` list. On Android 11+ package visibility filtering affects discovery and interaction with other apps; Android's own guide explicitly calls out bound-service integration as a reason to add a package entry. The main app now lists only `com.mithaq.network` and `com.mithaq.network.debug`, rather than requesting `QUERY_ALL_PACKAGES`.
+
+The isolated worker was already declared `isolatedProcess=true` and non-exported. Its test now uses the API's dedicated `bindIsolatedService()` path and a unique instance name, after verifying the installed ServiceInfo flags and process name. Both tests record `onNullBinding`, `onBindingDied`, and `onServiceDisconnected`, include permission/UID/process context in failures, and allow a 30-second cold-start window. The test service logs its `onCreate` and `onBind` events.
+
+### CI diagnostics
+
+The emulator job clears logcat before the boundary tests. If instrumentation fails, it captures logcat, main/companion package metadata, and ActivityManager service state to an artifact. This is intended to distinguish missing package visibility, permission denial, component resolution, service-process crash, null binding, and slow cold start on the next run.
+
+### Separate cleanup warning
+
+The reported `/sdcard/Android/media/com.mithaq.app.debug/additional_test_output` removal denial came from the Android test-output collection path and appeared before the JUnit failures. The test runner continued and reported two actual assertion failures. It is not treated as the cause of either Binder timeout. The next CI run will preserve service/process logcat so this remains independently diagnosable if it persists.
+
+### Verification status
+
+- Main manifest declares only the release/debug companion package visibility; no broad package visibility permission is introduced.
+- Source test code validates companion metadata, signature permission grant, matching signing certificates, isolated service flags, unique isolated binding and terminal callbacks.
+- Static checks and archive integrity: to be rerun before delivery.
+- Gradle compilation, Android manifest merge, Binder callbacks, UID separation, private-file denial and different-signer denial: pending the next hosted Android 36 emulator run. This checkpoint is a source-level correction and diagnostic improvement, not a claim that emulator tests have passed.

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.IBinder
 import android.os.Process
+import android.util.Log
 import java.io.File
 
 /**
@@ -13,6 +14,11 @@ import java.io.File
  * It is intentionally not connected to LiteRT-LM and accepts no model files.
  */
 class IsolatedInferenceProbeService : Service() {
+    override fun onCreate() {
+        super.onCreate()
+        Log.i(TAG, "ISOLATED_PROBE_CREATED uid=${Process.myUid()} pid=${Process.myPid()}")
+    }
+
     private val binder = object : IIsolatedInferenceProbe.Stub() {
         override fun getWorkerUid(): Int = Process.myUid()
 
@@ -25,5 +31,12 @@ class IsolatedInferenceProbeService : Service() {
             if (checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) 0 else -1
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    override fun onBind(intent: Intent?): IBinder {
+        Log.i(TAG, "ISOLATED_PROBE_BOUND uid=${Process.myUid()} pid=${Process.myPid()}")
+        return binder
+    }
+
+    private companion object {
+        const val TAG = "MithaqIsolatedProbe"
+    }
 }

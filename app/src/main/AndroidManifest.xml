@@ -1,5 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <!-- The separately installed companion must be query-visible for explicit
+         cross-package bindService calls on Android 11+. Include release and
+         debug IDs; no broad QUERY_ALL_PACKAGES permission is used. -->
+    <queries>
+        <package android:name="com.mithaq.network" />
+        <package android:name="com.mithaq.network.debug" />
+    </queries>
     <!-- AndroidX Core adds a legacy not-exported receiver permission for API < 33.
          Mithaq minSdk is 35, where ContextCompat uses the platform API 33+ overload.
          Remove both library nodes so neither APK requests an unused custom permission. -->

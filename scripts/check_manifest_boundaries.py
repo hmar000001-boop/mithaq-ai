@@ -65,6 +65,30 @@ main_permissions = uses_permissions(main)
 companion_permissions = uses_permissions(companion)
 attacker_permissions = uses_permissions(attacker)
 
+visible_packages = {
+    node.attrib.get(ANDROID + "name")
+    for node in main.findall("queries/package")
+}
+expected_visible_packages = {"com.mithaq.network", "com.mithaq.network.debug"}
+if not expected_visible_packages.issubset(visible_packages):
+    fail(
+        "Main app must declare package visibility only for the release and debug "
+        f"network companion IDs; missing {expected_visible_packages - visible_packages}"
+    )
+if any("QUERY_ALL_PACKAGES" in value for value in main_permissions):
+    fail("Main app must not use QUERY_ALL_PACKAGES")
+
+android_test_manifest = ROOT / "app/src/androidTest/AndroidManifest.xml"
+if not android_test_manifest.is_file():
+    fail("Missing instrumentation manifest with explicit package-visibility declarations")
+test_manifest = load("app/src/androidTest/AndroidManifest.xml")
+test_visible_packages = {
+    node.attrib.get(ANDROID + "name")
+    for node in test_manifest.findall("queries/package")
+}
+if not expected_visible_packages.issubset(test_visible_packages):
+    fail("Instrumentation package must declare visibility for the network companion")
+
 for label, manifest in (("main", main), ("companion", companion)):
     for tag in ("permission", "uses-permission"):
         if not has_merger_removal(manifest, tag, DYNAMIC_RECEIVER_PERMISSION):

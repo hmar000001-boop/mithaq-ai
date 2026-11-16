@@ -67,3 +67,30 @@ The source manifest audit now verifies these two removal directives are present 
 - XML parsing and Python source audits: to be rerun for checkpoint 0.1.3.
 - Android manifest merge, Gradle build, packaged AAPT audit and emulator tests: require the next GitHub Actions run.
 - The permission checker was not weakened.
+
+
+# Checkpoint 0.1.4 — Binder service connection timeouts
+
+**Reported run:** 2026-11-16T20:44Z  
+**Affected task:** `:app:connectedDebugAndroidTest`
+
+## Reported symptoms
+
+- Build, APK packaging and packaged permission checks progressed successfully.
+- `isolatedWorkerHasSeparateUidAndCannotReadHostPrivateFile` timed out waiting for the isolated worker connection.
+- `companionBinderIsReachableOnlyThroughTheSignedCompanionContract` timed out waiting for the separate companion connection.
+- A `/sdcard/Android/media/.../additional_test_output` cleanup command was denied, but the test runner continued and reported JUnit test failures. It is not assumed to be the Binder root cause.
+
+## Source-level causes addressed
+
+The main app had no package visibility declaration for its cross-package network companion. Android 11+ package visibility filters interactions with other installed packages; the Android package visibility guide specifically includes service binding among the use cases for a `<queries><package>` declaration. The main app and instrumentation test manifest now list only the release and debug companion IDs. No `QUERY_ALL_PACKAGES` permission is added.
+
+The isolated-worker test used generic `bindService()` and had only a single timeout assertion. It now calls `bindIsolatedService()` with a unique instance name and validates the service's isolated-process metadata first. Both tests report `onNullBinding`, `onBindingDied` and `onServiceDisconnected`, verify the companion's signature permission and signer match, and wait up to 30 seconds for cold process startup.
+
+## Additional diagnostics
+
+The emulator job now clears logcat before the tests and captures logcat, `dumpsys package` for both application IDs, and ActivityManager service state when instrumentation fails. Those diagnostics are uploaded with the JUnit report.
+
+## Status
+
+This is a **source-level corrective checkpoint**. The next GitHub Actions emulator run must prove the two Binder callbacks actually occur. The isolated-worker boundary and signature-protected companion are not considered validated until the hosted emulator tests pass.

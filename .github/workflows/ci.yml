@@ -154,7 +154,17 @@ jobs:
             adb install --no-incremental network-companion/build/outputs/apk/debug/network-companion-debug.apk
             adb install --no-incremental app/build/outputs/apk/debug/app-debug.apk
             adb install --no-incremental unauthorized-probe/build/outputs/apk/debug/unauthorized-probe-debug.apk
-            gradle --no-daemon :app:connectedDebugAndroidTest
+            mkdir -p "$RUNNER_TEMP/mithaq-emulator-diagnostics"
+            adb logcat -c
+            if ! gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest; then
+              echo "Collecting emulator diagnostics after instrumentation failure."
+              adb logcat -d -v threadtime > "$RUNNER_TEMP/mithaq-emulator-diagnostics/logcat.txt" || true
+              adb shell dumpsys package com.mithaq.app.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/main-package.txt" || true
+              adb shell dumpsys package com.mithaq.network.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/companion-package.txt" || true
+              adb shell dumpsys activity services com.mithaq.app.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/main-services.txt" || true
+              adb shell dumpsys activity services com.mithaq.network.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/companion-services.txt" || true
+              exit 1
+            fi
             adb logcat -c
             adb shell am start -n com.mithaq.attackerprobe.debug/com.mithaq.attackerprobe.AttackerProbeActivity
             denied=0
@@ -184,6 +194,7 @@ jobs:
           path: |
             app/build/reports/androidTests/**
             app/build/outputs/androidTest-results/**
+            ${{ runner.temp }}/mithaq-emulator-diagnostics/**
 
   release-build:
     name: Build and sign release assets

@@ -49,6 +49,20 @@ for module in ("app", "network-companion", "network-contract", "unauthorized-pro
     if "version = release(37)" not in build or "minorApiLevel = 0" not in build:
         fail(f"{module} must compile against explicit Android API 37.0")
 
+main_manifest = (ROOT / "app/src/main/AndroidManifest.xml").read_text()
+if '<queries>' not in main_manifest or 'com.mithaq.network.debug' not in main_manifest or 'com.mithaq.network"' not in main_manifest:
+    fail("Main app must declare narrowly scoped package visibility for release/debug companion IDs")
+if 'android:name="android.permission.QUERY_ALL_PACKAGES"' in main_manifest:
+    fail("Main app must not request broad QUERY_ALL_PACKAGES visibility")
+
+boundary_test = (ROOT / "app/src/androidTest/java/com/mithaq/app/BoundaryInstrumentedTest.kt").read_text()
+if "bindIsolatedService(" not in boundary_test:
+    fail("Isolated inference boundary test must use bindIsolatedService with an explicit instance name")
+if "onNullBinding" not in boundary_test or "onBindingDied" not in boundary_test:
+    fail("Binder boundary tests must report terminal ServiceConnection callbacks, not only time out")
+if "SERVICE_CONNECTION_TIMEOUT_SECONDS = 30L" not in boundary_test:
+    fail("Binder instrumentation timeout must allow cold-start headroom on hosted emulators")
+
 all_docs = "\n".join(p.read_text(errors="ignore") for p in (ROOT / "docs").rglob("*.md"))
 if "English only" not in all_docs:
     fail("Docs must state English-only v0 language policy")
@@ -59,3 +73,4 @@ print("Project invariants: PASS")
 print("- Mithaq package identities and SDK matrix (API 37.0) are pinned")
 print("- AGP 9.3.1 / Gradle 9.7.0 / Kotlin 2.4.21 compatibility pins are explicit")
 print("- English-only v0 / future Arabic / no French recorded")
+print("- Narrow package visibility and explicit isolated-service binding are enforced")

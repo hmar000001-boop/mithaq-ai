@@ -7,10 +7,10 @@
 | P0-MAN-03 | Companion IPC exposure | Parse exported service | Service exported only with signature permission | Python CI audit |
 | P0-MAN-04 | Shared UID | Parse both manifests | No sharedUserId | Python CI audit |
 | P0-MAN-05 | AndroidX legacy receiver permission | Merge both app manifests and inspect packaged APKs | API<33-only `${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is removed because minSdk=35; no extra permission appears in either APK | Source merger-directive audit + AAPT APK audit |
-| P0-IPC-01 | Same-publisher IPC | Bind from main app to companion | Protocol version 1 and challenge echo succeed | Android instrumentation |
+| P0-IPC-01 | Same-publisher IPC | Confirm companion is query-visible, verify same signer and signature permission grant, then bind from main app | Protocol version 1 and challenge echo succeed | Android instrumentation + package/service diagnostics |
 | P0-IPC-02 | Package isolation | Query both service UIDs | Main and companion service UIDs differ | Android instrumentation |
 | P0-IPC-03 | Unauthorized caller | Build a probe APK with an ephemeral CI-generated, unrelated signing certificate; attempt explicit bind | Android rejects binding to the signature-protected Binder service | Emulator CI negative test |
-| P0-INF-01 | Isolated service UID | Bind main to isolated probe | Worker UID differs from host app UID | Android instrumentation |
+| P0-INF-01 | Isolated service UID | Verify `ServiceInfo.FLAG_ISOLATED_PROCESS`, then use `bindIsolatedService` with a unique instance name | Worker UID differs from host app UID | Android instrumentation + package/service diagnostics |
 | P0-INF-02 | Private-file isolation | Worker attempts to read host marker | Access denied | Android instrumentation |
 | P0-INF-03 | Permission isolation | Worker checks INTERNET permission | Denied | Android instrumentation |
 | P0-CI-01 | Compile and unit test | Gradle CI tasks | All modules compile and tests pass | GitHub Actions |
@@ -19,6 +19,8 @@
 | P0-REL-02 | Release asset upload | Tag-triggered release | APK, AAB and checksum attached | GitHub Release |
 | P0-CI-03 | Third-party action integrity | Static workflow scan | Every external action uses a full 40-character commit SHA | `scripts/check_workflow_pins.py` |
 | P0-CI-04 | Android SDK provisioning | Inspect all SDK install blocks | Stable API 36 and Build Tools 36.0.0 are installed; exact API 37.0 package is installed with `platforms;android-37.0` and its `android.jar` is checked | `scripts/check_project_invariants.py` |
+| P0-IPC-04 | Android package visibility | Inspect main/test `<queries>` | Only release/debug companion IDs are visible; no `QUERY_ALL_PACKAGES` | Source manifest audit |
+| P0-CI-05 | Instrumentation diagnostics | Force/observe instrumentation failure | Upload logcat and ActivityManager/package dumps with the test report | CI artifact |
 | P0-REL-03 | Play-distributed companion authorization | Compare Play-generated APK signing certificates from both listings | Same app-signing certificate for main and companion | Play internal-testing release gate; not run |
 
 ## SDK provisioning failure and correction (checkpoint 0.1.2)
