@@ -1,0 +1,28 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Granted only to apps signed with the same certificate as the companion. -->
+    <uses-permission android:name="com.mithaq.network.permission.BIND_COMPANION" />
+
+    <application
+        android:allowBackup="false"
+        android:label="Mithaq"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Phase-0 proof service only. It is not the production inference service. -->
+        <service
+            android:name=".probe.IsolatedInferenceProbeService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":inference_probe"
+            android:stopWithTask="true" />
+    </application>
+</manifest>

@@ -1,0 +1,296 @@
+name: Mithaq Android CI
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*.*.*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mithaq-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Unit tests, lint, manifest audit and debug APKs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Install pinned Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          gradle-version: '9.7.0'
+          cache-disabled: true
+
+      - name: Run manifest and project audits
+        run: |
+          python3 scripts/check_manifest_boundaries.py
+          python3 scripts/check_project_invariants.py
+          python3 scripts/check_workflow_pins.py
+
+      - name: Run unit tests, lint and build both debug APKs
+        run: >-
+          gradle --no-daemon --stacktrace clean
+          :app:testDebugUnitTest
+          :network-contract:testDebugUnitTest
+          :network-companion:testDebugUnitTest
+          :unauthorized-probe:testDebugUnitTest
+          :app:lintDebug
+          :network-companion:lintDebug
+          :app:assembleDebug
+          :network-companion:assembleDebug
+
+      - name: Audit packaged APK permissions
+        run: |
+          python3 scripts/check_apk_permissions.py \
+            app/build/outputs/apk/debug/app-debug.apk \
+            network-companion/build/outputs/apk/debug/network-companion-debug.apk \
+            debug
+
+      - name: Upload debug APKs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mithaq-debug-apks-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            network-companion/build/outputs/apk/debug/*.apk
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mithaq-ci-reports-${{ github.sha }}
+          if-no-files-found: ignore
+          path: |
+            **/build/reports/tests/**
+            **/build/reports/lint-results-*.html
+            **/build/test-results/**
+
+  instrumented-boundary-tests:
+    name: Android emulator boundary tests
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Install pinned Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          gradle-version: '9.7.0'
+          cache-disabled: true
+
+      - name: Create a one-run attacker signing identity
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt -v \
+            -keystore "$RUNNER_TEMP/mithaq-attacker-test.jks" \
+            -storetype JKS -storepass "test-only-store-password" \
+            -keypass "test-only-key-password" -alias attacker-test \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=Mithaq CI Unauthorized Probe, OU=Tests, O=Mithaq, C=CA"
+          echo "MITHAQ_ATTACKER_KEYSTORE_FILE=$RUNNER_TEMP/mithaq-attacker-test.jks" >> "$GITHUB_ENV"
+          echo "MITHAQ_ATTACKER_KEYSTORE_PASSWORD=test-only-store-password" >> "$GITHUB_ENV"
+          echo "MITHAQ_ATTACKER_KEY_ALIAS=attacker-test" >> "$GITHUB_ENV"
+          echo "MITHAQ_ATTACKER_KEY_PASSWORD=test-only-key-password" >> "$GITHUB_ENV"
+
+      - name: Build, install companion and run boundary tests on emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0, reviewed commit
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            gradle --no-daemon :app:assembleDebug :network-companion:assembleDebug :unauthorized-probe:assembleDebug
+            adb install --no-incremental network-companion/build/outputs/apk/debug/network-companion-debug.apk
+            adb install --no-incremental app/build/outputs/apk/debug/app-debug.apk
+            adb install --no-incremental unauthorized-probe/build/outputs/apk/debug/unauthorized-probe-debug.apk
+            gradle --no-daemon :app:connectedDebugAndroidTest
+            adb logcat -c
+            adb shell am start -n com.mithaq.attackerprobe.debug/com.mithaq.attackerprobe.AttackerProbeActivity
+            denied=0
+            for attempt in $(seq 1 10); do
+              if adb logcat -d -s MithaqPermissionProbe:I | grep -q MITHAQ_PERMISSION_PROBE_DENIED; then
+                denied=1
+                break
+              fi
+              sleep 1
+            done
+            if [ "$denied" -ne 1 ]; then
+              adb logcat -d -s MithaqPermissionProbe:E
+              echo "Differently signed app was not denied by companion Binder signature permission." >&2
+              exit 1
+            fi
+            if adb logcat -d -s MithaqPermissionProbe:E | grep -Eq 'MITHAQ_PERMISSION_PROBE_FAILED|MITHAQ_PERMISSION_PROBE_INVALID'; then
+              adb logcat -d -s MithaqPermissionProbe:E
+              exit 1
+            fi
+
+      - name: Upload instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mithaq-instrumentation-${{ github.sha }}
+          if-no-files-found: ignore
+          path: |
+            app/build/reports/androidTests/**
+            app/build/outputs/androidTest-results/**
+
+  release-build:
+    name: Build and sign release assets
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-test, instrumented-boundary-tests]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Install pinned Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          gradle-version: '9.7.0'
+          cache-disabled: true
+
+      - name: Build signed APKs and Android App Bundles
+        env:
+          MITHAQ_KEYSTORE_BASE64: ${{ secrets.MITHAQ_KEYSTORE_BASE64 }}
+          MITHAQ_KEYSTORE_PASSWORD: ${{ secrets.MITHAQ_KEYSTORE_PASSWORD }}
+          MITHAQ_KEY_ALIAS: ${{ secrets.MITHAQ_KEY_ALIAS }}
+          MITHAQ_KEY_PASSWORD: ${{ secrets.MITHAQ_KEY_PASSWORD }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_CODE: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          for name in MITHAQ_KEYSTORE_BASE64 MITHAQ_KEYSTORE_PASSWORD MITHAQ_KEY_ALIAS MITHAQ_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub Actions secret: ${name}" >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$RELEASE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must match vMAJOR.MINOR.PATCH." >&2
+            exit 1
+          fi
+
+          VERSION="${RELEASE_VERSION#v}"
+          KEYSTORE_PATH="$RUNNER_TEMP/mithaq-release.jks"
+          trap 'rm -f "$KEYSTORE_PATH"' EXIT
+          printf '%s' "$MITHAQ_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          export MITHAQ_KEYSTORE_FILE="$KEYSTORE_PATH"
+
+          gradle --no-daemon --stacktrace \
+            -PappVersion="$VERSION" -PappVersionCode="$RELEASE_CODE" \
+            :app:testReleaseUnitTest \
+            :network-companion:testReleaseUnitTest \
+            :network-contract:testReleaseUnitTest \
+            :app:lintRelease \
+            :network-companion:lintRelease \
+            :app:assembleRelease \
+            :network-companion:assembleRelease \
+            :app:bundleRelease \
+            :network-companion:bundleRelease
+
+          python3 scripts/check_apk_permissions.py \
+            app/build/outputs/apk/release/app-release.apk \
+            network-companion/build/outputs/apk/release/network-companion-release.apk \
+            release
+
+          MAIN_CERT="$("$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1)"
+          COMPANION_CERT="$("$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --print-certs network-companion/build/outputs/apk/release/network-companion-release.apk | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1)"
+          if [ -z "$MAIN_CERT" ] || [ "$MAIN_CERT" != "$COMPANION_CERT" ]; then
+            echo "Main and companion release APK signing certificates do not match." >&2
+            exit 1
+          fi
+          echo "Release APK signatures verified; both packages share the same certificate."
+
+          mkdir -p release-assets
+          cp app/build/outputs/apk/release/app-release.apk "release-assets/Mithaq-${VERSION}.apk"
+          cp network-companion/build/outputs/apk/release/network-companion-release.apk "release-assets/Mithaq-Network-Companion-${VERSION}.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "release-assets/Mithaq-${VERSION}.aab"
+          cp network-companion/build/outputs/bundle/release/network-companion-release.aab "release-assets/Mithaq-Network-Companion-${VERSION}.aab"
+          (cd release-assets && sha256sum *.apk *.aab > SHA256SUMS.txt)
+
+      - name: Upload prepared release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mithaq-release-assets-${{ github.ref_name }}
+          if-no-files-found: error
+          path: release-assets/*
+
+  publish-release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download prepared release assets
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mithaq-release-assets-${{ github.ref_name }}
+          path: release-assets
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*.apk
+            release-assets/*.aab
+            release-assets/SHA256SUMS.txt

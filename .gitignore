@@ -1,0 +1,19 @@
+.gradle/
+.idea/
+*.iml
+local.properties
+.DS_Store
+/build/
+**/build/
+.cxx/
+.externalNativeBuild/
+*.apk
+*.aab
+*.keystore
+*.jks
+release-signing.properties
+keystore.properties
+
+# Local static-check output
+__pycache__/
+*.py[cod]
