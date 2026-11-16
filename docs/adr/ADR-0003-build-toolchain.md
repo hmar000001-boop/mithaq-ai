@@ -27,3 +27,15 @@ AGP 9 enables built-in Kotlin. This project explicitly opts out during Phase 0 s
 ## Wrapper caveat
 
 The project ZIP does not include a fake or incomplete Gradle Wrapper JAR. CI installs Gradle 9.7.0 using `gradle/actions/setup-gradle`. A standard wrapper can be generated with Gradle 9.7.0 and committed when the owner has a local Gradle installation.
+
+
+## SDK package channel policy
+
+The project uses `compileSdk = 37` because the selected Compose BOM `2026.09.00` requires API 37. At the time of this checkpoint, Android 17 / API 37 is distributed as a preview SDK package, while API 36 is available on the stable channel. The CI workflow therefore installs the packages in two explicit operations:
+
+```bash
+sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+sdkmanager --channel=3 "platforms;android-37"
+```
+
+Do not request API 37 from the default stable channel. The CI failure reported on 16 November 2026 was caused by doing exactly that; it occurred before Gradle was invoked. API 37 is used only for compilation. `targetSdk` remains 36 pending the next Play target-API requirement and runtime qualification. The preview SDK package may change while Android 17 remains preview; record SDK package revision in CI logs and re-run the full build/test matrix when it changes.

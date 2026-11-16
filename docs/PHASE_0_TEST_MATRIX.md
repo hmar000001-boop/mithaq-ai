@@ -17,7 +17,12 @@
 | P0-REL-01 | Release package signing | Tag-triggered build | Both APKs signed by same release certificate | GitHub Actions + `apksigner` follow-up |
 | P0-REL-02 | Release asset upload | Tag-triggered release | APK, AAB and checksum attached | GitHub Release |
 | P0-CI-03 | Third-party action integrity | Static workflow scan | Every external action uses a full 40-character commit SHA | `scripts/check_workflow_pins.py` |
+| P0-CI-04 | Android SDK provisioning | Inspect all SDK install blocks | Stable API 36 from channel 0 and preview API 37 from channel 3 are installed separately | `scripts/check_project_invariants.py` |
 | P0-REL-03 | Play-distributed companion authorization | Compare Play-generated APK signing certificates from both listings | Same app-signing certificate for main and companion | Play internal-testing release gate; not run |
+
+## SDK provisioning failure and correction (checkpoint 0.1.1)
+
+The first hosted run failed during `sdkmanager` provisioning with `Failed to find package 'platforms;android-37'`. This is consistent with requesting Android 17 / API 37 from the default stable channel while the Android 17 setup guide places API 37 in the preview channel. The workflow now installs stable API 36 with `--channel=0` and API 37 with `--channel=3`. The Gradle build and emulator jobs have not yet been observed succeeding; rerun CI after uploading checkpoint 0.1.1.
 
 ## Negative test coverage and remaining checks
 

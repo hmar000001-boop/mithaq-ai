@@ -9,6 +9,8 @@ Reviewed on 16 November 2026. Pin versions in the repository; re-check these sou
 | Gradle 9.7.0 | https://docs.gradle.org/9.7.0/release-notes.html | Within KGP 2.4.21's documented maximum fully-supported Gradle version |
 | Kotlin 2.4.21 | https://kotlinlang.org/docs/releases.html | Pinned stable release |
 | Google Play target API | https://support.google.com/googleplay/android-developer/answer/11926878 | API 36 required for new apps and updates from 31 Aug 2026 |
+| Android 17 SDK setup | https://developer.android.com/about/versions/17/setup-sdk | API 37 is currently distributed in the Android 17 preview SDK channel; project compiles against 37 but targets 36 |
+| SDK Manager channel options | https://developer.android.com/tools/sdkmanager | Channel 0 is stable; channel 3 includes canary and earlier channels; CI requests API 37 explicitly from channel 3 |
 | Compose BOM | https://developer.android.com/develop/ui/compose/bom | Stable BOM 2026.09.00 |
 | Activity Compose | https://developer.android.com/jetpack/androidx/releases/activity | Stable 1.13.0 |
 | LiteRT-LM Android Kotlin guide | https://developers.google.com/edge/litert-lm/android | Public generator guide uses a model path; isolated FD loading remains a proof |

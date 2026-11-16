@@ -33,8 +33,11 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37" "build-tools;36.0.0"
+          # API 36 is stable. Android 17 / API 37 is currently distributed
+          # through the preview channel, so request it explicitly.
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null
+          sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager --channel=3 "platforms;android-37"
 
       - name: Install pinned Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -106,8 +109,11 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37" "build-tools;36.0.0"
+          # API 36 is stable. Android 17 / API 37 is currently distributed
+          # through the preview channel, so request it explicitly.
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null
+          sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager --channel=3 "platforms;android-37"
 
       - name: Install pinned Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -195,8 +201,11 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37" "build-tools;36.0.0"
+          # API 36 is stable. Android 17 / API 37 is currently distributed
+          # through the preview channel, so request it explicitly.
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null
+          sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager --channel=3 "platforms;android-37"
 
       - name: Install pinned Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1

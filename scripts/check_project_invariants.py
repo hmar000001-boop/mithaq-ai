@@ -24,6 +24,12 @@ for expected in (
 
 if workflow.count("gradle-version: '9.7.0'") != 3:
     fail("All three CI build jobs must install the pinned Gradle 9.7.0 toolchain")
+if workflow.count('sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"') != 3:
+    fail("All CI jobs must install stable API 36 and Build Tools 36.0.0")
+if workflow.count('sdkmanager --channel=3 "platforms;android-37"') != 3:
+    fail("All CI jobs must install preview API 37 from the preview SDK channel")
+if 'sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37"' in workflow:
+    fail("API 37 must not be requested from the stable SDK channel")
 
 for key, value in (("android.builtInKotlin", "false"), ("android.newDsl", "false")):
     if f"{key}={value}" not in gradle_props:

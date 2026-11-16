@@ -41,7 +41,14 @@ No actual model is bundled or downloaded. No search, page fetch or HTTP proxy ha
 
 The project currently uses a pinned Gradle installation provisioned by GitHub Actions. A Gradle Wrapper binary could not be included in this authoring environment, so this checkpoint intentionally does not include a broken `gradlew` script or a placeholder wrapper JAR.
 
-Install JDK 17, Android SDK Platform 36 and 37, Build Tools 36.0.0, and Gradle 9.7.0. Then run from the repository root:
+Install JDK 17 and Gradle 9.7.0. Install the stable Android 16 / API 36 platform and Build Tools 36.0.0, then install Android 17 / API 37 from the preview channel:
+
+```bash
+sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+sdkmanager --channel=3 "platforms;android-37"
+```
+
+API 37 is currently published in the Android 17 preview channel; requesting it from the default stable SDK channel returns “Failed to find package”. The workflow installs stable API 36 and preview API 37 separately. `targetSdk` remains 36 for the current Google Play submission requirement. Then run from the repository root:
 
 ```bash
 gradle --version
@@ -133,6 +140,6 @@ The Release job uses the tag as `versionName` and the workflow run number as the
 
 ## Current status and limitations
 
-Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md) and the ADRs before extending the architecture. The ZIP is source-complete for the current checkpoint, but no successful Gradle/Android build is claimed from the authoring environment: it has JDK 21 but no Android SDK, Gradle installation, or network access to resolve Android dependencies. The first GitHub Actions run is the authoritative build validation for this repository snapshot.
+Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md) and the ADRs before extending the architecture. The ZIP is source-complete for the current checkpoint, but no successful Gradle/Android build is claimed from the authoring environment: it has JDK 21 but no Android SDK, Gradle installation, or network access to resolve Android dependencies. The first hosted run reached SDK provisioning but stopped because API 37 was requested from the stable channel. Checkpoint 0.1.1 corrects this by installing API 37 from the preview channel; the next GitHub Actions run is the authoritative build validation for this repository snapshot.
 
 Phase 0 is not complete until GitHub CI and the emulator boundary tests pass. LiteRT-LM descriptor loading, EmbeddingGemma Android integration, PromptGuard ONNX parity, strict SSRF fetching, image inference, 8 GB device qualification and release signing remain open engineering gates.
