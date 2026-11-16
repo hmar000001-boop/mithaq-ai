@@ -33,11 +33,14 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          # API 36 is stable. Android 17 / API 37 is currently distributed
-          # through the preview channel, so request it explicitly.
+          # Android 37 uses a major.minor SDK package identifier.
+          # The published API 37.0 package is platforms;android-37.0.
           yes 2>/dev/null | sdkmanager --licenses >/dev/null
           sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          sdkmanager --channel=3 "platforms;android-37"
+          sdkmanager --channel=3 "platforms;android-37.0"
+          test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"
+          echo "Installed Android SDK platform:"
+          cat "$ANDROID_HOME/platforms/android-37.0/source.properties"
 
       - name: Install pinned Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -109,11 +112,14 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          # API 36 is stable. Android 17 / API 37 is currently distributed
-          # through the preview channel, so request it explicitly.
+          # Android 37 uses a major.minor SDK package identifier.
+          # The published API 37.0 package is platforms;android-37.0.
           yes 2>/dev/null | sdkmanager --licenses >/dev/null
           sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          sdkmanager --channel=3 "platforms;android-37"
+          sdkmanager --channel=3 "platforms;android-37.0"
+          test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"
+          echo "Installed Android SDK platform:"
+          cat "$ANDROID_HOME/platforms/android-37.0/source.properties"
 
       - name: Install pinned Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -201,11 +207,14 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          # API 36 is stable. Android 17 / API 37 is currently distributed
-          # through the preview channel, so request it explicitly.
+          # Android 37 uses a major.minor SDK package identifier.
+          # The published API 37.0 package is platforms;android-37.0.
           yes 2>/dev/null | sdkmanager --licenses >/dev/null
           sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          sdkmanager --channel=3 "platforms;android-37"
+          sdkmanager --channel=3 "platforms;android-37.0"
+          test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"
+          echo "Installed Android SDK platform:"
+          cat "$ANDROID_HOME/platforms/android-37.0/source.properties"
 
       - name: Install pinned Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1

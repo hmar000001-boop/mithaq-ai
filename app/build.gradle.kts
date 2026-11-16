@@ -17,7 +17,11 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "com.mithaq.app"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
     buildToolsVersion = "36.0.0"
 
     defaultConfig {

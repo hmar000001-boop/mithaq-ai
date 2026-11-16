@@ -9,8 +9,8 @@ Reviewed on 16 November 2026. Pin versions in the repository; re-check these sou
 | Gradle 9.7.0 | https://docs.gradle.org/9.7.0/release-notes.html | Within KGP 2.4.21's documented maximum fully-supported Gradle version |
 | Kotlin 2.4.21 | https://kotlinlang.org/docs/releases.html | Pinned stable release |
 | Google Play target API | https://support.google.com/googleplay/android-developer/answer/11926878 | API 36 required for new apps and updates from 31 Aug 2026 |
-| Android 17 SDK setup | https://developer.android.com/about/versions/17/setup-sdk | API 37 is currently distributed in the Android 17 preview SDK channel; project compiles against 37 but targets 36 |
-| SDK Manager channel options | https://developer.android.com/tools/sdkmanager | Channel 0 is stable; channel 3 includes canary and earlier channels; CI requests API 37 explicitly from channel 3 |
+| Android 17 SDK setup | https://developer.android.com/about/versions/17/setup-sdk | Android 17 preview SDK is API 37.0; package ID is `platforms;android-37.0`; project compiles against minor API 0 and targets 36 |
+| SDK Manager channel options | https://developer.android.com/tools/sdkmanager | Channel 0 is stable; channel 3 includes canary and earlier channels; CI requests exact package `platforms;android-37.0` and verifies `android.jar` |
 | Compose BOM | https://developer.android.com/develop/ui/compose/bom | Stable BOM 2026.09.00 |
 | Activity Compose | https://developer.android.com/jetpack/androidx/releases/activity | Stable 1.13.0 |
 | LiteRT-LM Android Kotlin guide | https://developers.google.com/edge/litert-lm/android | Public generator guide uses a model path; isolated FD loading remains a proof |
@@ -40,3 +40,10 @@ Gradle setup caching is disabled. The `setup-java` v6.3.0 release makes the Java
 
 - Google Play App Signing: https://support.google.com/googleplay/android-developer/answer/9842756
 - Because Mithaq uses a signature-level Binder permission across two separately listed apps, ensure both Play-delivered APKs share the same app-signing certificate. The upload key is not the app-signing key.
+
+- Android Gradle compileSdk minor API syntax: https://developer.android.com/reference/tools/gradle-api/9.3/com/android/build/api/dsl/CompileSdkSpec (expanded `compileSdk` block with `minorApiLevel`).
+
+## Android API 37.0 package details
+
+- GitHub Actions runner-image issue documenting the exact package and directory (`platforms;android-37.0` / `platforms/android-37.0`), not `android-37`: https://github.com/actions/runner-images/issues/13859
+- AGP 9.3 `CompileSdkSpec` API documents `compileSdk { version = release(37) { minorApiLevel = 0 } }`; the API was added in AGP 8.13.0: https://developer.android.com/reference/tools/gradle-api/9.3/com/android/build/api/dsl/CompileSdkSpec

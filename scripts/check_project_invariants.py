@@ -26,10 +26,12 @@ if workflow.count("gradle-version: '9.7.0'") != 3:
     fail("All three CI build jobs must install the pinned Gradle 9.7.0 toolchain")
 if workflow.count('sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"') != 3:
     fail("All CI jobs must install stable API 36 and Build Tools 36.0.0")
-if workflow.count('sdkmanager --channel=3 "platforms;android-37"') != 3:
-    fail("All CI jobs must install preview API 37 from the preview SDK channel")
-if 'sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37"' in workflow:
-    fail("API 37 must not be requested from the stable SDK channel")
+if workflow.count('sdkmanager --channel=3 "platforms;android-37.0"') != 3:
+    fail("All CI jobs must install the exact Android 37.0 package from a preview-inclusive channel")
+if workflow.count('test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"') != 3:
+    fail("All CI jobs must verify the Android 37.0 platform payload before Gradle starts")
+if 'platforms;android-37"' in workflow:
+    fail("The nonexistent integer-only API 37 package must not be requested")
 
 for key, value in (("android.builtInKotlin", "false"), ("android.newDsl", "false")):
     if f"{key}={value}" not in gradle_props:
@@ -39,8 +41,13 @@ for module, application_id in (("app", "com.mithaq.app"), ("network-companion", 
     build = (ROOT / module / "build.gradle.kts").read_text()
     if f'applicationId = "{application_id}"' not in build:
         fail(f"Unexpected applicationId for {module}")
-    if "minSdk = 35" not in build or "targetSdk = 36" not in build or "compileSdk = 37" not in build:
+    if "minSdk = 35" not in build or "targetSdk = 36" not in build:
         fail(f"SDK matrix drift in {module}")
+
+for module in ("app", "network-companion", "network-contract", "unauthorized-probe"):
+    build = (ROOT / module / "build.gradle.kts").read_text()
+    if "version = release(37)" not in build or "minorApiLevel = 0" not in build:
+        fail(f"{module} must compile against explicit Android API 37.0")
 
 all_docs = "\n".join(p.read_text(errors="ignore") for p in (ROOT / "docs").rglob("*.md"))
 if "English only" not in all_docs:
@@ -49,6 +56,6 @@ if "Arabic" not in all_docs or "French is excluded" not in all_docs:
     fail("Docs must preserve future Arabic and explicit French exclusion")
 
 print("Project invariants: PASS")
-print("- Mithaq package identities and SDK matrix are pinned")
+print("- Mithaq package identities and SDK matrix (API 37.0) are pinned")
 print("- AGP 9.3.1 / Gradle 9.7.0 / Kotlin 2.4.21 compatibility pins are explicit")
 print("- English-only v0 / future Arabic / no French recorded")

@@ -14,7 +14,7 @@
 | Compose BOM | 2026.09.00 | Stable Compose BOM |
 | Activity Compose | 1.13.0 | Stable Activity Compose release |
 | JDK | 17 | AGP 9.3 supported minimum/default |
-| Compile SDK | 37 | Maximum supported by AGP 9.3 |
+| Compile SDK | 37.0 | Maximum supported by AGP 9.3; explicit minor API level 0 |
 | Target SDK | 36 | Google Play new-app/update target requirement from 31 August 2026 |
 | Min SDK | 35 | Agreed Android 15+ product baseline |
 
@@ -29,13 +29,25 @@ AGP 9 enables built-in Kotlin. This project explicitly opts out during Phase 0 s
 The project ZIP does not include a fake or incomplete Gradle Wrapper JAR. CI installs Gradle 9.7.0 using `gradle/actions/setup-gradle`. A standard wrapper can be generated with Gradle 9.7.0 and committed when the owner has a local Gradle installation.
 
 
-## SDK package channel policy
+## SDK package identity and minor API policy
 
-The project uses `compileSdk = 37` because the selected Compose BOM `2026.09.00` requires API 37. At the time of this checkpoint, Android 17 / API 37 is distributed as a preview SDK package, while API 36 is available on the stable channel. The CI workflow therefore installs the packages in two explicit operations:
+Android 37 is published using a major/minor SDK package identity. The exact SDK package is `platforms;android-37.0`; `platforms;android-37` does not exist. The earlier Phase 0.1.1 workflow corrected the preview channel but retained the wrong package identifier, which explains the second failed run on 16 November 2026.
 
-```bash
-sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-sdkmanager --channel=3 "platforms;android-37"
+All Android modules therefore use the expanded AGP DSL and pin the minor API explicitly:
+
+```kotlin
+compileSdk {
+    version = release(37) {
+        minorApiLevel = 0
+    }
+}
 ```
 
-Do not request API 37 from the default stable channel. The CI failure reported on 16 November 2026 was caused by doing exactly that; it occurred before Gradle was invoked. API 37 is used only for compilation. `targetSdk` remains 36 pending the next Play target-API requirement and runtime qualification. The preview SDK package may change while Android 17 remains preview; record SDK package revision in CI logs and re-run the full build/test matrix when it changes.
+CI installs the package from a channel that includes preview packages and verifies the platform payload before Gradle starts:
+
+```bash
+sdkmanager --channel=3 "platforms;android-37.0"
+test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"
+```
+
+This avoids confusing the API level number with the SDK package identifier and ensures local builds and CI compile against the same API 37.0 surface. API 36 remains the emulator and target SDK baseline for Phase 0. Record the installed `source.properties` revision in CI logs and rerun the build/test matrix if the selected platform package changes.

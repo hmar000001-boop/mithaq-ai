@@ -1,14 +1,14 @@
-# Phase 0 CI Fixes — Checkpoint 0.1.1
+# Phase 0 CI Fixes — Checkpoint 0.1.2
 
-**Date:** 16 November 2026
-**Reported failing run:** 2026-11-16T20:20:46Z
+**Date:** 16 November 2026  
+**Reported failing run:** 2026-11-16T20:28:56Z  
 **Affected step:** Install Android SDK packages
 
 ## Root cause
 
-The workflow requested `platforms;android-37` in a default-channel `sdkmanager` invocation. Android 17 / API 37 is currently distributed as a preview SDK package. The SDK Manager only includes stable packages unless a channel is requested. Therefore `sdkmanager` could install API 36 but did not discover API 37 and exited with status 1. Gradle was never started in this run.
+Checkpoint 0.1.1 correctly added a preview-inclusive SDK channel, but it still requested the wrong package identifier: `platforms;android-37`. Android 37 uses a major/minor SDK package name. The published package is `platforms;android-37.0`; the integer-only package does not exist. This is a package-name mismatch, not a failure to select a sufficiently broad SDK channel.
 
-The `yes: standard output: Broken pipe` diagnostic came from the license-acceptance pipe closing after `sdkmanager` had consumed its input. It is not the build failure. Its stderr is suppressed to remove noise; the `sdkmanager --licenses` command's exit status is still checked.
+A further compatibility issue can arise because tools may resolve integer API 37 as `android-37`, while the installed directory is `android-37.0`. AGP's expanded `compileSdk` DSL supports explicit minor API selection. Each Android module now sets `release(37) { minorApiLevel = 0 }`, matching the SDK package. This is preferable to creating a filesystem alias that can mask a mismatch.
 
 ## Correction
 
@@ -17,23 +17,29 @@ All three SDK installation blocks (main build/test job, emulator job and release
 ```bash
 yes 2>/dev/null | sdkmanager --licenses >/dev/null
 sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-sdkmanager --channel=3 "platforms;android-37"
+sdkmanager --channel=3 "platforms;android-37.0"
+test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"
+cat "$ANDROID_HOME/platforms/android-37.0/source.properties"
 ```
 
-Rationale:
+Every Android module uses:
 
-- API 36 is installed from the stable channel and remains the target/emulator API.
-- API 37 is installed explicitly from the preview channel for `compileSdk = 37`.
-- `targetSdk = 36` is unchanged; compile SDK and target SDK have different roles.
-- The Compose BOM selected for this project requires compile SDK 37, so lowering compile SDK to 36 would introduce a separate compatibility issue.
+```kotlin
+compileSdk {
+    version = release(37) {
+        minorApiLevel = 0
+    }
+}
+```
+
+`targetSdk = 36`, emulator API 36, and Build Tools 36.0.0 remain unchanged. API 37.0 is used for compilation only at this stage.
 
 ## Regression protection
 
-`scripts/check_project_invariants.py` now requires the stable API 36 and preview API 37 installation commands in all three jobs and rejects the original single-channel request pattern.
+`scripts/check_project_invariants.py` now requires the exact `android-37.0` package identifier and a post-install `android.jar` existence check in all three CI jobs. It rejects the old `platforms;android-37` request and verifies every Android module explicitly declares minor API level 0.
 
 ## Verification status
 
-- Source-level workflow correction: applied.
-- Regression invariant: added; local execution pending.
-- Python script syntax: to be run before packaging.
-- Hosted Gradle build, unit tests, APK assembly and emulator instrumentation: pending the owner's next GitHub Actions run.
+- Source-level workflow and build-file correction: applied.
+- Static project, manifest, workflow-pin, XML and YAML checks: rerun locally before packaging.
+- Hosted Gradle build, unit tests, APK assembly and emulator instrumentation: pending the next GitHub Actions run.

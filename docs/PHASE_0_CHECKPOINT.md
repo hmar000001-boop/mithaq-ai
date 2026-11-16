@@ -1,4 +1,4 @@
-# Mithaq Phase 0 — Checkpoint 0.1.1
+# Mithaq Phase 0 — Checkpoint 0.1.2
 
 **Date:** 16 November 2026  
 **Baseline:** Product specification r1.5, amended for the selected brand name Mithaq  
@@ -14,7 +14,7 @@
 - Main app has no `INTERNET` or `ACCESS_NETWORK_STATE` permission.
 - Companion has only the bounded network permissions required for its future role.
 - Companion Binder endpoint is exported only with a signature-level permission.
-- Android min API 35, target API 36, compile API 37.
+- Android min API 35, target API 36, compile API 37.0.
 - JDK 17, AGP 9.3.1, Gradle 9.7.0, Kotlin 2.4.21.
 - Release uploads are manual repository push plus GitHub Actions CI; version tags produce signed APK/AAB assets.
 
@@ -69,14 +69,14 @@ A Gradle Wrapper JAR could not be retrieved in this build environment. No fake o
 | Python workflow pin audit | PASS | `scripts/check_workflow_pins.py`; all third-party action refs use full commit SHAs |
 | Python syntax compile | PASS | All repository Python scripts compile with `py_compile` |
 | CI YAML syntax and structural scan | PASS | Parsed locally; GitHub-hosted execution remains pending |
-| SDK channel invariant | PASS | All three workflow jobs install stable API 36 and preview API 37 from the explicit channels |
+| SDK package invariant | PASS | All three workflow jobs request the exact `platforms;android-37.0` package and verify its `android.jar`; all Android modules pin minor API 0 |
 | Gradle configuration/build | Not yet reached by hosted CI | The first run failed in SDK provisioning before Gradle; this checkpoint fixes that step. The authoring runtime also has no Gradle/Android SDK |
 | Unit tests | Not run | Requires Gradle/Android SDK resolution |
 | APK builds | Not run | Requires Android SDK/Gradle |
 | Binder emulator test | Not run | Requires API 36 emulator |
 | Release signing/upload | Not run | Requires owner-created GitHub secrets and tag |
 
-The first hosted run failed before Gradle was invoked because API 37 was requested from the stable SDK channel. Checkpoint 0.1.1 corrects the channel selection. The next hosted run is required to validate Gradle, unit tests, APK assembly and emulator instrumentation. Any subsequent failure must be corrected in the next complete ZIP checkpoint; do not treat source presence as proof that a test passed.
+Two hosted runs failed before Gradle was invoked. Checkpoint 0.1.1 corrected the channel but not the package ID. Checkpoint 0.1.2 uses `platforms;android-37.0` and explicit minor API 0. The next hosted run is required to validate SDK provisioning, Gradle, unit tests, APK assembly and emulator instrumentation. Any subsequent failure must be corrected in the next complete ZIP checkpoint; do not treat source presence as proof that a test passed.
 
 ## 6. Play App Signing constraint
 
@@ -98,7 +98,7 @@ Phase 0 remains open until:
 
 ## 8. Next work within Phase 0
 
-1. Upload checkpoint 0.1.1 and rerun GitHub Actions; confirm the API 37 SDK package installs from preview channel 3.
+1. Upload checkpoint 0.1.2 and rerun GitHub Actions; confirm `platforms;android-37.0` installs, `android.jar` exists, and Gradle resolves API 37.0.
 2. Fix any subsequent Gradle/AGP/AIDL/Compose/manifest/instrumentation failures and issue a full replacement ZIP.
 3. Run LiteRT-LM Gemma 4 E4B raw-FD proof on a physical Android 16/API 36 device.
 4. Run EmbeddingGemma text-only inference proof, verify exact model artifact/tokenizer/template and output dimensions.
@@ -115,5 +115,7 @@ Phase 0 remains open until:
 - R3 — Google Play target API requirements: https://support.google.com/googleplay/android-developer/answer/11926878
 - R4 — AGP 9 built-in Kotlin and migration guidance: https://developer.android.com/build/migrate-to-built-in-kotlin
 - R5 — Google Play App Signing, including the option to use the same app-signing key for multiple listings before rollout: https://support.google.com/googleplay/android-developer/answer/9842756
-- R7 — Set up the Android 17 SDK; documents API 37 as preview: https://developer.android.com/about/versions/17/setup-sdk
+- R7 — Set up the Android 17 SDK; documents compileSdk 37 and the Android 17 SDK package: https://developer.android.com/about/versions/17/setup-sdk
+- R8 — AGP CompileSdkSpec; documents `release(37) { minorApiLevel = 0 }`: https://developer.android.com/reference/tools/gradle-api/9.3/com/android/build/api/dsl/CompileSdkSpec
+- R9 — GitHub Actions runner-image issue confirming API 37.0 package ID and `android-37.0` install path: https://github.com/actions/runner-images/issues/13859
 - R8 — SDK Manager channel options (0 stable, 1 beta, 2 dev, 3 canary): https://developer.android.com/tools/sdkmanager

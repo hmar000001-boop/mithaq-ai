@@ -8,7 +8,7 @@ Mithaq is a native Kotlin Android personal AI workspace. This repository is the 
 - **v0 language:** English only; English is the default.
 - **Future language:** Arabic is planned, but it is not a supported v0 language.
 - **French:** explicitly excluded.
-- **Android:** min API 35 (Android 15), target API 36, compile API 37.
+- **Android:** min API 35 (Android 15), target API 36, compile API 37.0.
 - **ABI target:** `arm64-v8a` for production model/runtime qualification. The Phase-0 APK also builds for emulator testing.
 - **Device qualification target:** 8 GB RAM minimum test target; 12 GB recommended. No device is declared supported until the full runtime and thermal matrix passes.
 - **Build:** AGP 9.3.1, Gradle 9.7.0, Kotlin 2.4.21, JDK 17, Compose BOM 2026.09.00.
@@ -41,14 +41,15 @@ No actual model is bundled or downloaded. No search, page fetch or HTTP proxy ha
 
 The project currently uses a pinned Gradle installation provisioned by GitHub Actions. A Gradle Wrapper binary could not be included in this authoring environment, so this checkpoint intentionally does not include a broken `gradlew` script or a placeholder wrapper JAR.
 
-Install JDK 17 and Gradle 9.7.0. Install the stable Android 16 / API 36 platform and Build Tools 36.0.0, then install Android 17 / API 37 from the preview channel:
+Install JDK 17 and Gradle 9.7.0. Install stable Android 16 / API 36 and Build Tools 36.0.0, then install the Android 17 API 37.0 platform package. Note the required `.0` suffix: `platforms;android-37` does not exist.
 
 ```bash
 sdkmanager --channel=0 "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-sdkmanager --channel=3 "platforms;android-37"
+sdkmanager --channel=3 "platforms;android-37.0"
+test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"
 ```
 
-API 37 is currently published in the Android 17 preview channel; requesting it from the default stable SDK channel returns “Failed to find package”. The workflow installs stable API 36 and preview API 37 separately. `targetSdk` remains 36 for the current Google Play submission requirement. Then run from the repository root:
+The Android modules declare `compileSdk` with `release(37) { minorApiLevel = 0 }`, matching the installed `android-37.0` package. The earlier CI correction fixed the channel but still used the nonexistent integer-only package identifier; checkpoint 0.1.2 fixes the actual package name and makes the minor API explicit. `targetSdk` remains 36. Then run from the repository root:
 
 ```bash
 gradle --version
@@ -140,6 +141,6 @@ The Release job uses the tag as `versionName` and the workflow run number as the
 
 ## Current status and limitations
 
-Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md) and the ADRs before extending the architecture. The ZIP is source-complete for the current checkpoint, but no successful Gradle/Android build is claimed from the authoring environment: it has JDK 21 but no Android SDK, Gradle installation, or network access to resolve Android dependencies. The first hosted run reached SDK provisioning but stopped because API 37 was requested from the stable channel. Checkpoint 0.1.1 corrects this by installing API 37 from the preview channel; the next GitHub Actions run is the authoritative build validation for this repository snapshot.
+Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md) and the ADRs before extending the architecture. The ZIP is source-complete for the current checkpoint, but no successful Gradle/Android build is claimed from the authoring environment: it has JDK 21 but no Android SDK, Gradle installation, or network access to resolve Android dependencies. Two hosted SDK-provisioning attempts exposed the API 37 package-name nuance. Checkpoint 0.1.1 corrected the SDK channel but still requested the nonexistent `platforms;android-37` ID. Checkpoint 0.1.2 requests `platforms;android-37.0` and explicitly declares minor API level 0; the next GitHub Actions run is the authoritative build validation for this repository snapshot.
 
 Phase 0 is not complete until GitHub CI and the emulator boundary tests pass. LiteRT-LM descriptor loading, EmbeddingGemma Android integration, PromptGuard ONNX parity, strict SSRF fetching, image inference, 8 GB device qualification and release signing remain open engineering gates.
