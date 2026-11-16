@@ -1,9 +1,9 @@
-# Mithaq Phase 0 — Checkpoint 0.1.2
+# Mithaq Phase 0 — Checkpoint 0.1.3
 
 **Date:** 16 November 2026  
 **Baseline:** Product specification r1.5, amended for the selected brand name Mithaq  
-**Checkpoint type:** Repository and security-boundary foundation; SDK provisioning correction  
-**Status:** Source prepared; Android CI execution pending
+**Checkpoint type:** Repository and security-boundary foundation; packaged permission audit correction  
+**Status:** Source prepared; hosted Gradle/APK/emulator validation pending
 
 ## 1. Product decisions frozen for this checkpoint
 
@@ -26,12 +26,12 @@
 | Network companion application | Separate Android application, launcher and service | `network-companion/` |
 | Shared IPC contract | Minimal AIDL protocol interface | `network-contract/` |
 | Signature-level Binder protection | Exported companion service requires `com.mithaq.network.permission.BIND_COMPANION` with `protectionLevel=signature` | Companion manifest |
-| Main app least privilege | No Internet or network-state permission | Main manifest + Python audit |
+| Main app least privilege | Requests only the companion signature permission; no network or unused AndroidX legacy receiver permission | Main manifest merger rules + source/APK audits |
 | Isolated process probe | `isolatedProcess=true`, non-exported service | Main manifest + probe service |
 | Positive Binder test | Main app binds companion, round-trips challenge, checks distinct UIDs | `BoundaryInstrumentedTest` |
 | Negative Binder test | Separate probe APK signed with an ephemeral, unrelated CI certificate attempts to bind and must be denied | `unauthorized-probe/` + emulator workflow (hosted run pending) |
 | Isolation test | Checks isolated UID differs, cannot read host-private marker, lacks Internet permission | `BoundaryInstrumentedTest` |
-| Build checks | Python manifest and product invariants | `scripts/` |
+| Build checks | Python manifest and product invariants, including explicit removal of AndroidX Core's API<33 receiver-permission fallback | `scripts/` |
 | CI | Unit tests, lint, both debug APKs, emulator tests, artifact uploads | `.github/workflows/ci.yml` |
 | Release publishing | Signed APK/AAB and checksums uploaded to GitHub Release on `v*.*.*` tags | `publish-release` job |
 
@@ -76,7 +76,7 @@ A Gradle Wrapper JAR could not be retrieved in this build environment. No fake o
 | Binder emulator test | Not run | Requires API 36 emulator |
 | Release signing/upload | Not run | Requires owner-created GitHub secrets and tag |
 
-Two hosted runs failed before Gradle was invoked. Checkpoint 0.1.1 corrected the channel but not the package ID. Checkpoint 0.1.2 uses `platforms;android-37.0` and explicit minor API 0. The next hosted run is required to validate SDK provisioning, Gradle, unit tests, APK assembly and emulator instrumentation. Any subsequent failure must be corrected in the next complete ZIP checkpoint; do not treat source presence as proof that a test passed.
+Two hosted runs failed before Gradle was invoked. Checkpoint 0.1.1 corrected the channel but not the package ID; checkpoint 0.1.2 fixed that by requesting `platforms;android-37.0` and explicitly setting minor API 0. The next hosted run reached the APK permission audit and found an AndroidX Core compatibility permission in the main APK. Checkpoint 0.1.3 removes that unused API<33 fallback permission from both app manifests because minSdk is 35; the strict APK audit remains unchanged and will verify the packaged result. Gradle, test, APK and emulator status must be confirmed by hosted CI; no source-level change is treated as a successful build.
 
 ## 6. Play App Signing constraint
 
@@ -98,7 +98,7 @@ Phase 0 remains open until:
 
 ## 8. Next work within Phase 0
 
-1. Upload checkpoint 0.1.2 and rerun GitHub Actions; confirm `platforms;android-37.0` installs, `android.jar` exists, and Gradle resolves API 37.0.
+1. Upload checkpoint 0.1.3 and rerun GitHub Actions; confirm both packaged APK permission audits pass with the strict expected permission sets.
 2. Fix any subsequent Gradle/AGP/AIDL/Compose/manifest/instrumentation failures and issue a full replacement ZIP.
 3. Run LiteRT-LM Gemma 4 E4B raw-FD proof on a physical Android 16/API 36 device.
 4. Run EmbeddingGemma text-only inference proof, verify exact model artifact/tokenizer/template and output dimensions.
@@ -118,4 +118,6 @@ Phase 0 remains open until:
 - R7 — Set up the Android 17 SDK; documents compileSdk 37 and the Android 17 SDK package: https://developer.android.com/about/versions/17/setup-sdk
 - R8 — AGP CompileSdkSpec; documents `release(37) { minorApiLevel = 0 }`: https://developer.android.com/reference/tools/gradle-api/9.3/com/android/build/api/dsl/CompileSdkSpec
 - R9 — GitHub Actions runner-image issue confirming API 37.0 package ID and `android-37.0` install path: https://github.com/actions/runner-images/issues/13859
+- R10 — AndroidX Core source: its receiver-registration compatibility permission is only checked below API 33; API 33+ delegates to the platform overload: https://android.googlesource.com/platform/frameworks/support/+/4d0b56080497b79e6ac3d1b3b87f1029edf9c3c7/core/core/src/main/java/androidx/core/content/ContextCompat.java
+- R11 — Android security guide: the generated receiver permission is required when `minSdk < 33`, not when the supported baseline is API 35: https://developer.android.com/agents/skills/security/android-intent-security/skill
 - R8 — SDK Manager channel options (0 stable, 1 beta, 2 dev, 3 canary): https://developer.android.com/tools/sdkmanager

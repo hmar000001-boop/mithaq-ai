@@ -6,6 +6,7 @@
 | P0-MAN-02 | Companion network privilege | Parse companion manifest | INTERNET + ACCESS_NETWORK_STATE present | Python CI audit |
 | P0-MAN-03 | Companion IPC exposure | Parse exported service | Service exported only with signature permission | Python CI audit |
 | P0-MAN-04 | Shared UID | Parse both manifests | No sharedUserId | Python CI audit |
+| P0-MAN-05 | AndroidX legacy receiver permission | Merge both app manifests and inspect packaged APKs | API<33-only `${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is removed because minSdk=35; no extra permission appears in either APK | Source merger-directive audit + AAPT APK audit |
 | P0-IPC-01 | Same-publisher IPC | Bind from main app to companion | Protocol version 1 and challenge echo succeed | Android instrumentation |
 | P0-IPC-02 | Package isolation | Query both service UIDs | Main and companion service UIDs differ | Android instrumentation |
 | P0-IPC-03 | Unauthorized caller | Build a probe APK with an ephemeral CI-generated, unrelated signing certificate; attempt explicit bind | Android rejects binding to the signature-protected Binder service | Emulator CI negative test |
@@ -32,3 +33,8 @@ Two hosted runs failed during SDK provisioning. The first used an API 37 request
 - Run attacker-app tests against both packages again when additional IPC endpoints are added.
 - Prove the companion cannot read main app private files and does not receive arbitrary file descriptors or unrestricted URLs before adding content-bearing IPC methods.
 - Run Binder parcel-size and malformed-input tests before adding content-bearing IPC methods.
+
+
+## Packaged permission audit correction (checkpoint 0.1.3)
+
+AndroidX Core contributes a signature permission used only by its pre-API-33 `ContextCompat.registerReceiver` fallback. Since both Mithaq application modules set minSdk 35, each app manifest explicitly removes the library's `<permission>` and `<uses-permission>` nodes. The AAPT audit still enforces exact packaged permission sets: main APK = the companion signature permission only; companion APK = `INTERNET` and `ACCESS_NETWORK_STATE` only.

@@ -1,5 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Granted only to apps signed with the same certificate as the companion. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- AndroidX Core adds a legacy not-exported receiver permission for API < 33.
+         Mithaq minSdk is 35, where ContextCompat uses the platform API 33+ overload.
+         Remove both library nodes so neither APK requests an unused custom permission. -->
+    <permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
+    <uses-permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
+    <!-- Required to bind to the companion service protected by this signature permission. -->
     <uses-permission android:name="com.mithaq.network.permission.BIND_COMPANION" />
 
     <application

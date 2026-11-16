@@ -6,6 +6,8 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 ANDROID = "{http://schemas.android.com/apk/res/android}"
+TOOLS = "{http://schemas.android.com/tools}"
+DYNAMIC_RECEIVER_PERMISSION = "${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 COMPANION_PERMISSION = "com.mithaq.network.permission.BIND_COMPANION"
 
 
@@ -34,12 +36,44 @@ attacker = load("unauthorized-probe/src/main/AndroidManifest.xml")
 
 
 def uses_permissions(manifest):
-    return {node.attrib.get(ANDROID + "name") for node in manifest.findall("uses-permission")}
+    # Ignore explicit manifest-merger removal nodes; they remove library entries
+    # and do not represent permissions requested by the packaged application.
+    return {
+        node.attrib.get(ANDROID + "name")
+        for node in manifest.findall("uses-permission")
+        if node.attrib.get(TOOLS + "node") != "remove"
+    }
+
+
+def has_merger_removal(manifest, tag: str, permission_name: str) -> bool:
+    return any(
+        node.attrib.get(ANDROID + "name") == permission_name
+        and node.attrib.get(TOOLS + "node") == "remove"
+        for node in manifest.findall(tag)
+    )
+
+
+def has_active_node(manifest, tag: str, permission_name: str) -> bool:
+    return any(
+        node.attrib.get(ANDROID + "name") == permission_name
+        and node.attrib.get(TOOLS + "node") != "remove"
+        for node in manifest.findall(tag)
+    )
 
 
 main_permissions = uses_permissions(main)
 companion_permissions = uses_permissions(companion)
 attacker_permissions = uses_permissions(attacker)
+
+for label, manifest in (("main", main), ("companion", companion)):
+    for tag in ("permission", "uses-permission"):
+        if not has_merger_removal(manifest, tag, DYNAMIC_RECEIVER_PERMISSION):
+            fail(
+                f"{label} manifest must remove AndroidX Core's unused API<33 "
+                f"dynamic-receiver {tag} entry for minSdk 35"
+            )
+        if has_active_node(manifest, tag, DYNAMIC_RECEIVER_PERMISSION):
+            fail(f"{label} manifest must not keep an active {tag} for the legacy receiver permission")
 
 if main_permissions != {COMPANION_PERMISSION}:
     fail(f"Main app permissions must be exactly the companion signature permission; found {main_permissions}")
@@ -117,8 +151,8 @@ if permission is None or attr(permission, "protectionLevel") != "signature":
     fail("Companion Binder permission must be declared with protectionLevel=signature")
 
 print("Manifest boundary audit: PASS")
-print("- Main app: exactly one custom signature permission; no network permissions")
-print("- Companion: only INTERNET and ACCESS_NETWORK_STATE")
+print("- Main app: only the companion signature permission; no network or legacy AndroidX receiver permissions")
+print("- Companion: only INTERNET and ACCESS_NETWORK_STATE; no legacy AndroidX receiver permission")
 print("- Companion Binder: exported only behind the signature permission")
 print("- Unauthorized probe: no permissions and no companion signature grant")
 print("- Inference probe: isolatedProcess=true, exported=false")

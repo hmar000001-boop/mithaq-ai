@@ -43,3 +43,27 @@ compileSdk {
 - Source-level workflow and build-file correction: applied.
 - Static project, manifest, workflow-pin, XML and YAML checks: rerun locally before packaging.
 - Hosted Gradle build, unit tests, APK assembly and emulator instrumentation: pending the next GitHub Actions run.
+
+
+# Checkpoint 0.1.3 — Packaged permission audit correction
+
+**Reported failing run:** 2026-11-16T20:44:41Z  
+**Affected step:** Audit packaged APK permissions
+
+## Root cause
+
+The main APK requested the required `com.mithaq.network.permission.BIND_COMPANION`, plus `${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`. The latter is merged from AndroidX Core's library manifest. It is a signature-protected compatibility permission used by `ContextCompat.registerReceiver(..., RECEIVER_NOT_EXPORTED)` only on platform versions below API 33. The AndroidX implementation delegates to the native platform overload on API 33 and newer; Mithaq's minimum SDK is API 35. The compatibility permission is therefore unnecessary for every supported device.
+
+The companion uses the same AndroidX Activity/Compose dependency path and can receive the same merged declaration, so both packages must be checked.
+
+## Correction
+
+Both `app/src/main/AndroidManifest.xml` and `network-companion/src/main/AndroidManifest.xml` now use `tools:node="remove"` for both the library `<permission>` and `<uses-permission>` nodes keyed by `${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`. The legitimate main-app request for `com.mithaq.network.permission.BIND_COMPANION` remains unchanged. Companion `INTERNET` and `ACCESS_NETWORK_STATE` remain unchanged.
+
+The source manifest audit now verifies these two removal directives are present in both app manifests and ignores those directives when computing active source permissions. The packaged APK audit stays strict: the main APK must contain exactly the companion signature permission; the companion APK must contain exactly `INTERNET` and `ACCESS_NETWORK_STATE`. It does not whitelist or silently accept the AndroidX compatibility permission.
+
+## Verification status
+
+- XML parsing and Python source audits: to be rerun for checkpoint 0.1.3.
+- Android manifest merge, Gradle build, packaged AAPT audit and emulator tests: require the next GitHub Actions run.
+- The permission checker was not weakened.
