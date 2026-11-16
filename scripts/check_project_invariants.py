@@ -63,6 +63,34 @@ if "onNullBinding" not in boundary_test or "onBindingDied" not in boundary_test:
 if "SERVICE_CONNECTION_TIMEOUT_SECONDS = 30L" not in boundary_test:
     fail("Binder instrumentation timeout must allow cold-start headroom on hosted emulators")
 
+# Emulator workload must be prebuilt before emulator launch. Gradle compilation
+# used to run alongside Android's Package Manager and caused a flaky package
+# service transport failure during adb install. The runtime helper installs
+# prebuilt APKs and executes AndroidJUnitRunner directly through adb.
+prebuild_marker = "name: Prebuild emulator APKs before starting the emulator"
+emulator_marker = "uses: ReactiveCircus/android-emulator-runner@"
+if prebuild_marker not in workflow or emulator_marker not in workflow:
+    fail("Emulator APK prebuild and emulator-runner steps must both exist")
+if workflow.index(prebuild_marker) > workflow.index(emulator_marker):
+    fail("Emulator APKs must be built before the emulator is launched")
+prebuild_section = workflow[workflow.index(prebuild_marker):workflow.index(emulator_marker)]
+if ":app:assembleDebugAndroidTest" not in prebuild_section:
+    fail("Instrumentation APK must be prebuilt before emulator startup")
+emulator_script = (ROOT / "scripts/run_emulator_boundary_tests.sh").read_text()
+if "gradle " in emulator_script:
+    fail("Emulator runtime helper must not invoke Gradle while the emulator is running")
+for required in (
+    "wait_for_package_manager",
+    "package_manager_healthy",
+    "--no-streaming",
+    "pm list instrumentation",
+    "am instrument -w -r",
+    "MITHAQ_PERMISSION_PROBE_DENIED",
+    "capture_diagnostics final-failure",
+):
+    if required not in emulator_script:
+        fail(f"Emulator boundary runner is missing required behavior: {required}")
+
 all_docs = "\n".join(p.read_text(errors="ignore") for p in (ROOT / "docs").rglob("*.md"))
 if "English only" not in all_docs:
     fail("Docs must state English-only v0 language policy")

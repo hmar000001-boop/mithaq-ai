@@ -23,7 +23,7 @@ network-contract/            Small AIDL contract shared by both APKs
 network-companion/            Separate app/UID owning future bounded network operations
 unauthorized-probe/           Test-only app signed differently to verify Binder denial
 docs/                         Product baseline, Phase-0 report, ADRs and test matrix
-scripts/                      Source-manifest, APK-permission and project invariant checks
+scripts/                      Manifest/APK audits, invariants and emulator boundary-test runner
 .github/workflows/ci.yml      Unit tests, lint, APK builds, emulator boundary tests, tag releases
 ```
 
@@ -62,12 +62,25 @@ Build both APKs:
 gradle :app:assembleDebug :network-companion:assembleDebug
 ```
 
-Run the emulator boundary tests after installing the companion first:
+Build all emulator APKs before starting the emulator, including the instrumentation APK:
 
 ```bash
-adb install -r network-companion/build/outputs/apk/debug/network-companion-debug.apk
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-gradle :app:connectedDebugAndroidTest
+gradle --no-daemon --max-workers=2 \
+  :app:assembleDebug \
+  :app:assembleDebugAndroidTest \
+  :network-companion:assembleDebug \
+  :unauthorized-probe:assembleDebug
+```
+
+With an API 36 emulator running and Package Manager ready, invoke the same boundary-test helper used by CI:
+
+```bash
+bash scripts/run_emulator_boundary_tests.sh \
+  app/build/outputs/apk/debug/app-debug.apk \
+  network-companion/build/outputs/apk/debug/network-companion-debug.apk \
+  unauthorized-probe/build/outputs/apk/debug/unauthorized-probe-debug.apk \
+  app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+  ./emulator-diagnostics
 ```
 
 If you prefer the standard Gradle Wrapper locally, once Gradle 9.7.0 is installed run:
@@ -84,7 +97,7 @@ Review the generated wrapper files and commit them to the repository. The GitHub
 2. Extract the ZIP so that `README.md`, `settings.gradle.kts`, `app/`, `network-companion/`, and `.github/` are at the repository root. Do not upload the outer ZIP folder as an extra nested directory.
 3. Commit and push the extracted contents to the `main` branch.
 4. Open **Actions**. The `Mithaq Android CI` workflow runs on push and pull request.
-5. The build job runs Python source-manifest and project audits, Kotlin unit tests, Android lint, builds both debug APKs, and audits permissions in the packaged APKs. A second job runs the Binder/process-isolation instrumentation tests on an API 36 emulator, including the separately signed unauthorized-caller test. On instrumentation failure it uploads logcat and package/service diagnostics alongside the Android test reports.
+5. The build job runs Python source-manifest/project audits plus a fake-ADB regression test for the emulator helper, Kotlin unit tests, Android lint, builds both debug APKs, and audits permissions in the packaged APKs. A second job first builds all four required APKs (main, companion, separately signed attacker probe and instrumentation APK) before starting an API 36 emulator. The emulator helper waits for both Android boot completion and Package Manager responsiveness, installs the prebuilt APKs with `adb install --no-streaming`, discovers and runs AndroidJUnitRunner directly with `adb shell am instrument`, and then runs the separately signed unauthorized-caller test. It does not run Gradle while the emulator is active. On failure it uploads logcat, system properties, Package Manager, ActivityManager, memory, installed-package and instrumentation diagnostics.
 6. Download debug APKs from the workflow's artifacts. The main and companion debug packages are signed using the runner's debug certificate and are for testing only.
 
 ## Publishing APKs to GitHub Releases
@@ -141,6 +154,6 @@ The Release job uses the tag as `versionName` and the workflow run number as the
 
 ## Current status and limitations
 
-Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md) and the ADRs before extending the architecture. The ZIP is source-complete for the current checkpoint, but no successful Gradle/Android build is claimed from the authoring environment: it has JDK 21 but no Android SDK, Gradle installation, or network access to resolve Android dependencies. Two hosted SDK-provisioning attempts exposed the API 37 package-name nuance. Checkpoint 0.1.1 corrected the SDK channel but still requested the nonexistent `platforms;android-37` ID. Checkpoint 0.1.2 requests `platforms;android-37.0` and explicitly declares minor API level 0. Checkpoint 0.1.3 removes the unused AndroidX API<33 dynamic-receiver compatibility permission from both APKs while retaining the strict packaged permission checks. Checkpoint 0.1.4 adds explicit release/debug companion package visibility, uses the dedicated `bindIsolatedService` API for the isolated worker proof, checks service/permission/signature metadata before binding, reports all terminal Binder callbacks, extends the cold-start timeout to 30 seconds, and collects emulator diagnostics on failure. The next GitHub Actions run is the authoritative validation; the isolated-worker connection issue is not considered resolved until that run passes.
+Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md) and the ADRs before extending the architecture. The authoring environment does not have the Android SDK or Gradle, so all build claims are based on hosted GitHub Actions. Checkpoint 0.1.1 corrected the Android 17 SDK channel; checkpoint 0.1.2 corrected the exact `platforms;android-37.0` package name and explicit API minor level. Checkpoint 0.1.3 removed AndroidX Core's unused API<33 dynamic-receiver compatibility permission from both APK manifests while keeping the packaged permission audit strict. Checkpoint 0.1.4 added package-visibility declarations and improved Binder test diagnostics. The 16 November 2026 hosted run reached `BUILD SUCCESSFUL` for debug APK assembly, and the emulator job's `build-test` prerequisite passed, but the emulator failed before instrumentation at `adb install` with `Failure calling service package: Broken pipe (32)`. Checkpoint 0.1.5 moves all four emulator APK builds before emulator startup, avoids Gradle execution while the emulator is active, checks Package Manager readiness, uses `adb install --no-streaming`, and runs the same AndroidJUnitRunner suite directly with `adb shell am instrument`. The next hosted run must confirm whether this resolves the emulator install failure; the Binder boundary tests remain pending.
 
 Phase 0 is not complete until GitHub CI and the emulator boundary tests pass. LiteRT-LM descriptor loading, EmbeddingGemma Android integration, PromptGuard ONNX parity, strict SSRF fetching, image inference, 8 GB device qualification and release signing remain open engineering gates.

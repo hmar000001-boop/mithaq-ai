@@ -1,8 +1,8 @@
-# Mithaq Phase 0 — Checkpoint 0.1.3
+# Mithaq Phase 0 — Checkpoint 0.1.5
 
 **Date:** 16 November 2026  
 **Baseline:** Product specification r1.5, amended for the selected brand name Mithaq  
-**Checkpoint type:** Repository and security-boundary foundation; packaged permission audit correction  
+**Checkpoint type:** Repository/security-boundary foundation; emulator Package Manager install reliability correction  
 **Status:** Source prepared; hosted Gradle/APK/emulator validation pending
 
 ## 1. Product decisions frozen for this checkpoint
@@ -32,7 +32,7 @@
 | Negative Binder test | Separate probe APK signed with an ephemeral, unrelated CI certificate attempts to bind and must be denied | `unauthorized-probe/` + emulator workflow (hosted run pending) |
 | Isolation test | Checks isolated UID differs, cannot read host-private marker, lacks Internet permission | `BoundaryInstrumentedTest` |
 | Build checks | Python manifest and product invariants, including explicit removal of AndroidX Core's API<33 receiver-permission fallback | `scripts/` |
-| CI | Unit tests, lint, both debug APKs, emulator tests, artifact uploads | `.github/workflows/ci.yml` |
+| CI | Unit tests, lint, both debug APKs, prebuilt instrumentation APK, Package Manager readiness gate, direct AndroidJUnitRunner execution, artifact uploads | `.github/workflows/ci.yml`, `scripts/run_emulator_boundary_tests.sh` |
 | Release publishing | Signed APK/AAB and checksums uploaded to GitHub Release on `v*.*.*` tags | `publish-release` job |
 
 ## 3. Deliberately not implemented
@@ -69,14 +69,15 @@ A Gradle Wrapper JAR could not be retrieved in this build environment. No fake o
 | Python workflow pin audit | PASS | `scripts/check_workflow_pins.py`; all third-party action refs use full commit SHAs |
 | Python syntax compile | PASS | All repository Python scripts compile with `py_compile` |
 | CI YAML syntax and structural scan | PASS | Parsed locally; GitHub-hosted execution remains pending |
+| Emulator helper control-flow test | PASS | `scripts/test_emulator_boundary_runner.py` runs the helper with fake ADB and injects a transient Package Manager `Broken pipe`; bounded retry and test flow pass |
 | SDK package invariant | PASS | All three workflow jobs request the exact `platforms;android-37.0` package and verify its `android.jar`; all Android modules pin minor API 0 |
-| Gradle configuration/build | Not yet reached by hosted CI | The first run failed in SDK provisioning before Gradle; this checkpoint fixes that step. The authoring runtime also has no Gradle/Android SDK |
-| Unit tests | Not run | Requires Gradle/Android SDK resolution |
-| APK builds | Not run | Requires Android SDK/Gradle |
-| Binder emulator test | Not run | Requires API 36 emulator |
+| Gradle configuration and debug APK assembly | PASS (hosted) | The 16 November run completed with `BUILD SUCCESSFUL`; main, companion and attacker APK assembly completed. The instrumentation APK is now prebuilt in the new pre-emulator step. |
+| Unit tests and lint | PASS (hosted prerequisite job) | The emulator job ran only after `build-test` completed successfully, which requires unit tests, lint, APK assembly and the packaged permission audit. |
+| Main/companion APK builds | PASS (hosted) | Both debug APKs assembled successfully; native-symbol stripping emitted a non-fatal packaging warning for `libandroidx.graphics.path.so`. |
+| Binder emulator test | Pending hosted execution | APKs are prebuilt before emulator launch; helper validates Package Manager and runs AndroidJUnitRunner directly. Mock ADB harness passes but is not an emulator substitute. |
 | Release signing/upload | Not run | Requires owner-created GitHub secrets and tag |
 
-Two hosted runs failed before Gradle was invoked. Checkpoint 0.1.1 corrected the channel but not the package ID; checkpoint 0.1.2 fixed that by requesting `platforms;android-37.0` and explicitly setting minor API 0. The next hosted run reached the APK permission audit and found an AndroidX Core compatibility permission in the main APK. Checkpoint 0.1.3 removes that unused API<33 fallback permission from both app manifests because minSdk is 35; the strict APK audit remains unchanged and will verify the packaged result. Gradle, test, APK and emulator status must be confirmed by hosted CI; no source-level change is treated as a successful build.
+The initial hosted attempts exposed the API 37 package-name nuance; checkpoint 0.1.2 fixed it. Checkpoint 0.1.3 removed the unused AndroidX Core compatibility permission and retained the exact permission audit. The hosted `build-test` prerequisite subsequently completed, and APK assembly reported `BUILD SUCCESSFUL`; the emulator job then failed at the first package installation with `Failure calling service package: Broken pipe (32)`. This is before the instrumentation tests, so it does not invalidate the successful compilation/assembly but it also provides no Binder-boundary evidence. Checkpoint 0.1.5 moves all APK builds before emulator startup, avoids running Gradle during emulator runtime, waits for Package Manager responsiveness, uses non-streaming installation and directly invokes AndroidJUnitRunner. The next hosted emulator run remains the decisive validation.
 
 ## 6. Play App Signing constraint
 
@@ -98,8 +99,8 @@ Phase 0 remains open until:
 
 ## 8. Next work within Phase 0
 
-1. Upload checkpoint 0.1.3 and rerun GitHub Actions; confirm both packaged APK permission audits pass with the strict expected permission sets.
-2. Fix any subsequent Gradle/AGP/AIDL/Compose/manifest/instrumentation failures and issue a full replacement ZIP.
+1. Upload checkpoint 0.1.5 and rerun GitHub Actions; confirm packaged APK permission audits pass and the Package Manager/install gate succeeds.
+2. Confirm both AndroidJUnitRunner boundary tests and the differently signed attacker test pass; retain uploaded diagnostics if any step fails.
 3. Run LiteRT-LM Gemma 4 E4B raw-FD proof on a physical Android 16/API 36 device.
 4. Run EmbeddingGemma text-only inference proof, verify exact model artifact/tokenizer/template and output dimensions.
 5. Export PromptGuard 2 86M to ONNX, integrate the exact tokenizer and compare Android logits against reference Transformers results.

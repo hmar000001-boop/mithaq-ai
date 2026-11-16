@@ -94,3 +94,31 @@ The emulator job now clears logcat before the tests and captures logcat, `dumpsy
 ## Status
 
 This is a **source-level corrective checkpoint**. The next GitHub Actions emulator run must prove the two Binder callbacks actually occur. The isolated-worker boundary and signature-protected companion are not considered validated until the hosted emulator tests pass.
+
+
+## 16. Checkpoint 0.1.5 — Package Manager `Broken pipe` during emulator APK install
+
+### Hosted symptom
+
+The hosted build completed successfully, including both debug APK assemblies. The emulator action then failed on its first companion installation with:
+
+```text
+adb: failed to install network-companion-debug.apk:
+cmd: Failure calling service package: Broken pipe (32)
+```
+
+This occurs before the instrumentation tests start. The `Unable to strip libandroidx.graphics.path.so` messages are non-fatal native-symbol packaging warnings and are unrelated to the Package Manager failure.
+
+### Change
+
+- Added `scripts/run_emulator_boundary_tests.sh` to wait for boot and Package Manager readiness, install prebuilt APKs without streaming, invoke the AndroidJUnitRunner directly, run the differently signed attacker probe, and collect system diagnostics on failure.
+- Added a workflow step to prebuild the main APK, companion APK, attacker APK and instrumentation APK before launching the emulator.
+- Removed Gradle assembly and `connectedDebugAndroidTest` from the emulator action's runtime script; no Gradle compilation runs concurrently with emulator APK installation.
+- Added bounded retries for recognized Package Manager/ADB transport interruptions and at most one emulator reboot if the Package Manager service remains unavailable. Deterministic install errors fail immediately.
+- Added invariants that reject a workflow regression to building APKs after emulator startup or running Gradle from the emulator helper.
+- Added `scripts/test_emulator_boundary_runner.py`, which runs the helper against a fake ADB implementation and injects one transient `Broken pipe` response to verify the bounded retry and end-to-end runner flow without pretending to be a real emulator test.
+- Added ADR-0008 and updated the checkpoint, test matrix and README.
+
+### Validation boundary
+
+Static script/workflow/manifest/ZIP checks and the fake-ADB control-flow test validate the helper and its bounded retry, but only the next hosted emulator run can establish whether it resolves the actual emulator `Broken pipe` condition. The previous log does not prove the emulator OOMed or that `system_server` crashed; resource contention is treated as a plausible contributing condition, not a confirmed root cause.

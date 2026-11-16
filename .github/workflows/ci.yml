@@ -53,6 +53,7 @@ jobs:
           python3 scripts/check_manifest_boundaries.py
           python3 scripts/check_project_invariants.py
           python3 scripts/check_workflow_pins.py
+          python3 scripts/test_emulator_boundary_runner.py
 
       - name: Run unit tests, lint and build both debug APKs
         run: >-
@@ -141,49 +142,33 @@ jobs:
           echo "MITHAQ_ATTACKER_KEY_ALIAS=attacker-test" >> "$GITHUB_ENV"
           echo "MITHAQ_ATTACKER_KEY_PASSWORD=test-only-key-password" >> "$GITHUB_ENV"
 
-      - name: Build, install companion and run boundary tests on emulator
+      - name: Prebuild emulator APKs before starting the emulator
+        run: |
+          # Do not run Gradle compilation while the emulator's system_server and
+          # Package Manager are servicing APK installs. This reduces host-memory
+          # contention and makes a Package Manager transport failure diagnosable.
+          gradle --no-daemon --max-workers=2 \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :network-companion:assembleDebug \
+            :unauthorized-probe:assembleDebug
+
+      - name: Install APKs and run boundary tests on emulator
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0, reviewed commit
         with:
           api-level: 36
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          emulator-boot-timeout: 600
           disable-animations: true
           script: |
-            gradle --no-daemon :app:assembleDebug :network-companion:assembleDebug :unauthorized-probe:assembleDebug
-            adb install --no-incremental network-companion/build/outputs/apk/debug/network-companion-debug.apk
-            adb install --no-incremental app/build/outputs/apk/debug/app-debug.apk
-            adb install --no-incremental unauthorized-probe/build/outputs/apk/debug/unauthorized-probe-debug.apk
-            mkdir -p "$RUNNER_TEMP/mithaq-emulator-diagnostics"
-            adb logcat -c
-            if ! gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest; then
-              echo "Collecting emulator diagnostics after instrumentation failure."
-              adb logcat -d -v threadtime > "$RUNNER_TEMP/mithaq-emulator-diagnostics/logcat.txt" || true
-              adb shell dumpsys package com.mithaq.app.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/main-package.txt" || true
-              adb shell dumpsys package com.mithaq.network.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/companion-package.txt" || true
-              adb shell dumpsys activity services com.mithaq.app.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/main-services.txt" || true
-              adb shell dumpsys activity services com.mithaq.network.debug > "$RUNNER_TEMP/mithaq-emulator-diagnostics/companion-services.txt" || true
-              exit 1
-            fi
-            adb logcat -c
-            adb shell am start -n com.mithaq.attackerprobe.debug/com.mithaq.attackerprobe.AttackerProbeActivity
-            denied=0
-            for attempt in $(seq 1 10); do
-              if adb logcat -d -s MithaqPermissionProbe:I | grep -q MITHAQ_PERMISSION_PROBE_DENIED; then
-                denied=1
-                break
-              fi
-              sleep 1
-            done
-            if [ "$denied" -ne 1 ]; then
-              adb logcat -d -s MithaqPermissionProbe:E
-              echo "Differently signed app was not denied by companion Binder signature permission." >&2
-              exit 1
-            fi
-            if adb logcat -d -s MithaqPermissionProbe:E | grep -Eq 'MITHAQ_PERMISSION_PROBE_FAILED|MITHAQ_PERMISSION_PROBE_INVALID'; then
-              adb logcat -d -s MithaqPermissionProbe:E
-              exit 1
-            fi
+            bash scripts/run_emulator_boundary_tests.sh \
+              app/build/outputs/apk/debug/app-debug.apk \
+              network-companion/build/outputs/apk/debug/network-companion-debug.apk \
+              unauthorized-probe/build/outputs/apk/debug/unauthorized-probe-debug.apk \
+              app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+              "$RUNNER_TEMP/mithaq-emulator-diagnostics"
 
       - name: Upload instrumentation reports
         if: always()
