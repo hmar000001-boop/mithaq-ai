@@ -28,3 +28,12 @@ The project removes the emulator job/action, instrumentation source set and depe
 ## Important security-evidence qualification
 
 The new host suite verifies configuration and shared source contracts. It does not prove runtime Binder authorization, cross-UID behavior, isolated-process restrictions, private-file denial, Keystore or Android system-service behavior. These remain unverified technical properties and must not be represented as passed because unit and host integration tests are green.
+
+
+## Checkpoint 0.1.9 — fix stale tracked test files after ZIP overlay
+
+The first CI run after 0.1.8 failed at `check_project_invariants.py` because `app/src/androidTest` still existed in the repository checkout. Inspection of the 0.1.8 ZIP proved that this path was not present in the archive. The cause was the manual update workflow: extracting a ZIP over an existing Git repository does not delete tracked files that are absent from the archive. GitHub Actions then checked out the latest commit, where the old tracked directory remained.
+
+The workflow now runs `scripts/cleanup_retired_emulator_assets.py` immediately after checkout in both `build-test` and `release-build`. The script removes only four explicitly retired paths, without following symlinks or touching any other source. The strict project invariant remains in place and runs after the cleanup. The host-JVM integration suite verifies that both CI jobs invoke the cleanup script and that its allowlist is the expected retired set.
+
+For a permanent one-time repository cleanup, the owner should run the script in a local clone, stage the resulting deletions and commit them. See the migration instructions in `README.md` and `docs/PHASE_0_CHECKPOINT.md`.

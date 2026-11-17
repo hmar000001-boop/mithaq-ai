@@ -117,6 +117,18 @@ class HostIntegrationContractTest {
         assertTrue(workflow.contains(":app:testDebugUnitTest"))
         assertTrue(workflow.contains(":network-companion:testDebugUnitTest"))
         assertTrue(workflow.contains("needs: build-test"))
+        assertEquals(2, Regex("scripts/cleanup_retired_emulator_assets\\.py").findAll(workflow).count())
+        assertEquals(2, Regex("scripts/test_cleanup_retired_emulator_assets\\.py").findAll(workflow).count())
+        val cleanup = read("scripts/cleanup_retired_emulator_assets.py")
+        val cleanupTests = read("scripts/test_cleanup_retired_emulator_assets.py")
+        assertTrue(cleanupTests.contains("test_refuses_to_follow_a_symlinked_parent"))
+        assertTrue(cleanupTests.contains("test_unlinks_a_final_component_symlink_without_deleting_its_target"))
+        listOf(
+            "app/src/androidTest",
+            "unauthorized-probe",
+            "scripts/run_emulator_boundary_tests.sh",
+            "scripts/test_emulator_boundary_runner.py",
+        ).forEach { assertTrue("Legacy cleanup allowlist missing $it", cleanup.contains(it)) }
         assertFalse(File(root, "app/src/androidTest").exists())
         assertFalse(File(root, "unauthorized-probe").exists())
     }

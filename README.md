@@ -85,6 +85,24 @@ gradle wrapper --gradle-version 9.7.0 --distribution-type bin
 
 Review and commit the generated wrapper files. GitHub Actions provisions the exact Gradle version directly and does not depend on a wrapper.
 
+## Updating an existing GitHub repository with a project ZIP
+
+**Important: extracting a ZIP over an existing repository does not delete files that are absent from the new ZIP.** This was the cause of the follow-up failure after checkpoint 0.1.8: the 0.1.8 archive did not contain `app/src/androidTest`, but that directory was still tracked in the existing GitHub repository, so it remained in the next checkout and the invariant checker correctly rejected it.
+
+Checkpoint 0.1.9 includes an allowlisted migration script. Both CI jobs execute `scripts/cleanup_retired_emulator_assets.py` immediately after checkout and before audits/builds, then run its four host-side safety tests. It removes only `app/src/androidTest`, `unauthorized-probe`, `scripts/run_emulator_boundary_tests.sh` and `scripts/test_emulator_boundary_runner.py`. This keeps the build checkout free of retired emulator assets even when ZIP updates are overlaid onto an older repository. The project invariant still checks that those paths are absent after cleanup.
+
+To permanently remove the old tracked files from your repository (recommended), extract the ZIP into your local clone and run once:
+
+```bash
+python3 scripts/cleanup_retired_emulator_assets.py
+git add -A
+git status --short
+git commit -m "Remove retired emulator test assets"
+git push
+```
+
+Review `git status --short` and confirm that it shows deletions only for the retired emulator assets before committing. You can also delete the same four paths directly in the GitHub web interface. The CI cleanup remains as a safe compatibility measure for future ZIP-overlay updates.
+
 ## GitHub upload and CI workflow
 
 1. Create an empty GitHub repository for Mithaq (recommended name: `mithaq-android`).
@@ -145,6 +163,6 @@ The Release job uses the tag as `versionName` and the workflow run number as the
 
 ## Current status and limitations
 
-Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md), [`docs/PHASE_0_TEST_MATRIX.md`](docs/PHASE_0_TEST_MATRIX.md) and the ADRs before extending the architecture. Checkpoint 0.1.8 removes the unstable emulator E2E stage, its instrumentation suite, attacker-probe APK, isolated-process test probe and emulator orchestration scripts. CI is now deliberately limited to JVM unit tests, host-side integration checks, static audits, lint, APK assembly and packaged permission inspection. The previous hosted runs did reach successful APK assembly and all four APK installations before AndroidJUnitRunner crashed; that runtime test stage is retired, not reported as passed.
+Read [`docs/PHASE_0_CHECKPOINT.md`](docs/PHASE_0_CHECKPOINT.md), [`docs/PHASE_0_TEST_MATRIX.md`](docs/PHASE_0_TEST_MATRIX.md) and the ADRs before extending the architecture. Checkpoint 0.1.8 removed the unstable emulator E2E stage, its instrumentation suite, attacker-probe APK, isolated-process test probe and emulator orchestration scripts. Checkpoint 0.1.9 fixes stale tracked files left behind by ZIP-overlay uploads. CI is now deliberately limited to JVM unit tests, host-side integration checks, static audits, lint, APK assembly and packaged permission inspection. The previous hosted runs did reach successful APK assembly and all four APK installations before AndroidJUnitRunner crashed; that runtime test stage is retired, not reported as passed.
 
 Phase 0 still requires the normal hosted GitHub Actions run to pass the new host-only pipeline. LiteRT-LM descriptor loading, EmbeddingGemma Android integration, PromptGuard ONNX parity, strict SSRF fetching, image inference, actual runtime process-isolation qualification, 8 GB device qualification and release signing remain separate engineering gates.

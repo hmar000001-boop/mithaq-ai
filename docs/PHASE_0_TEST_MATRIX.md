@@ -1,6 +1,6 @@
 # Phase 0 — Test Matrix (host-only CI)
 
-**Policy:** automated CI runs JVM unit tests and host-side integration checks only. There are no Android instrumentation tests, emulator E2E tests, emulator boot/install steps or device-runner jobs.
+**Policy:** automated CI runs JVM unit tests and host-side integration checks only. There are no Android instrumentation tests, emulator E2E tests, emulator boot/install steps or device-runner jobs. A narrow migration cleanup removes only known retired files that can persist when a new ZIP is extracted over an older tracked checkout.
 
 | ID | Boundary or behavior | Test | Expected result | Current evidence |
 |---|---|---|---|---|
@@ -18,6 +18,7 @@
 | P0-CI-05 | Packaged permission boundary | AAPT inspection of both debug APKs | Main APK has only companion signature permission; companion has only INTERNET + ACCESS_NETWORK_STATE | `scripts/check_apk_permissions.py` |
 | P0-CI-06 | Third-party action integrity | Static workflow scan | Every external action uses a full 40-character commit SHA | `scripts/check_workflow_pins.py` |
 | P0-CI-07 | SDK provisioning | Inspect SDK install blocks | Build Tools 36.0.0 and API 37.0 compile platform are installed; no emulator/platform-tools setup | `scripts/check_project_invariants.py` |
+| P0-CI-08 | Legacy ZIP-overlay cleanup | Run allowlisted cleanup before audits in both CI jobs; execute cleanup safety tests | Four stale paths are removed, unrelated paths survive, and symlink redirection is rejected | `scripts/cleanup_retired_emulator_assets.py`, `scripts/test_cleanup_retired_emulator_assets.py` and host integration test |
 | P0-REL-01 | Release package signing | Tag-triggered build | Main and companion APKs signed with the same release certificate | Release CI + `apksigner` |
 | P0-REL-02 | Release asset upload | Tag-triggered release | APK, AAB and checksum files attached to GitHub Release | GitHub Release workflow |
 | P0-REL-03 | Play-distributed companion authorization | Compare Play-generated APK signing certificates from both listings | Both listings use the same Play app-signing certificate | Separate distribution qualification; not covered by host CI |

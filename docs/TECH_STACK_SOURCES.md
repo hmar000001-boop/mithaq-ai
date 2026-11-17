@@ -21,7 +21,7 @@ Reviewed on 16 November 2026. Pin versions in the repository; re-check these sou
 
 ## GitHub Actions release train reviewed for this checkpoint
 
-Every external action in `.github/workflows/ci.yml` is pinned to a full immutable commit SHA. Dependabot checks these pins weekly. The Android emulator runner was removed in checkpoint 0.1.8 because the owner selected host-JVM unit/integration tests only.
+Every external action in `.github/workflows/ci.yml` is pinned to a full immutable commit SHA. Dependabot checks these pins weekly. The Android emulator runner was removed in checkpoint 0.1.8 because the owner selected host-JVM unit/integration tests only. Checkpoint 0.1.9 adds an allowlisted cleanup after checkout because overlaying a ZIP does not delete older tracked test paths that are absent from the new archive.
 
 | Action | Release | Immutable commit SHA | Release/source |
 |---|---|---|---|

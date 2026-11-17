@@ -22,6 +22,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Remove retired emulator assets from ZIP-overlay checkouts
+        run: python3 scripts/cleanup_retired_emulator_assets.py
+
+      - name: Test legacy ZIP-overlay cleanup safety
+        run: python3 scripts/test_cleanup_retired_emulator_assets.py
+
       - name: Set up JDK 17
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
@@ -103,6 +109,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Remove retired emulator assets from ZIP-overlay checkouts
+        run: python3 scripts/cleanup_retired_emulator_assets.py
+
+      - name: Test legacy ZIP-overlay cleanup safety
+        run: python3 scripts/test_cleanup_retired_emulator_assets.py
 
       - name: Set up JDK 17
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0

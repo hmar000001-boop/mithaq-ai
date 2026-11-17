@@ -31,6 +31,18 @@ if not all(module in settings for module in expected_modules):
 if '"unauthorized-probe"' in settings:
     fail("Retired unauthorized-probe APK module must not remain included")
 
+cleanup_script = ROOT / "scripts/cleanup_retired_emulator_assets.py"
+if not cleanup_script.is_file():
+    fail("Allowlisted legacy emulator-asset cleanup script is required")
+if workflow.count("scripts/cleanup_retired_emulator_assets.py") != 2:
+    fail("Both CI jobs must purge legacy ZIP-overlay emulator assets before building")
+if workflow.count("scripts/test_cleanup_retired_emulator_assets.py") != 2:
+    fail("Both CI jobs must run host-side cleanup safety tests")
+cleanup_refs = [i for i in range(len(workflow)) if workflow.startswith("scripts/cleanup_retired_emulator_assets.py", i)]
+if len(cleanup_refs) != 2 or cleanup_refs[0] > workflow.index("name: Run manifest and project audits") or cleanup_refs[1] > workflow.index("name: Build signed APKs and Android App Bundles"):
+    fail("Legacy-asset cleanup must run before build-test audits and release builds")
+if not (ROOT / "scripts/test_cleanup_retired_emulator_assets.py").is_file():
+    fail("Host-side legacy cleanup safety tests are required")
 if workflow.count("gradle-version: '9.7.0'") != 2:
     fail("Both CI build jobs must install the pinned Gradle 9.7.0 toolchain")
 if workflow.count('sdkmanager --channel=3 "platforms;android-37.0"') != 2:

@@ -1,0 +1,9 @@
+# ADR-0008 — Clean retired emulator assets from ZIP-overlay checkouts
+
+- **Status:** Accepted
+- **Date:** 17 November 2026
+- **Context:** Checkpoint 0.1.8 intentionally removed `app/src/androidTest` and other emulator-only assets from the delivered ZIP. The next GitHub Actions run nevertheless found `app/src/androidTest`. Inspection confirmed that the path was absent from the ZIP, while the CI invariant correctly detected it in the repository checkout. The owner updates the repository by extracting project ZIPs over an existing checkout; this operation overwrites included files but does not delete tracked files omitted from the archive.
+- **Decision:** Run a narrowly allowlisted cleanup script immediately after `actions/checkout` and before audits/builds in both CI jobs. Keep the strict invariant checks after cleanup.
+- **Allowlist:** `app/src/androidTest`, `unauthorized-probe`, `scripts/run_emulator_boundary_tests.sh`, and `scripts/test_emulator_boundary_runner.py`. The script removes only these exact paths, handles symlinks without following them, and never recursively deletes a parent or broad source directory.
+- **Consequences:** Older repositories remain buildable after ZIP-overlay updates, while all CI build/test tasks execute with retired emulator assets absent. The cleanup is performed in the ephemeral runner checkout and does not rewrite Git history. The owner should run the script locally, stage the resulting deletions and commit them once to make the remote repository permanently clean.
+- **Testing:** `check_project_invariants.py` requires the cleanup step in both workflow jobs and verifies the retired paths are absent after the script runs. `HostIntegrationContractTest` verifies the workflow references and allowlist. No emulator, ADB or Android instrumentation tasks are introduced.
