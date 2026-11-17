@@ -62,6 +62,13 @@ if "onNullBinding" not in boundary_test or "onBindingDied" not in boundary_test:
     fail("Binder boundary tests must report terminal ServiceConnection callbacks, not only time out")
 if "SERVICE_CONNECTION_TIMEOUT_SECONDS = 30L" not in boundary_test:
     fail("Binder instrumentation timeout must allow cold-start headroom on hosted emulators")
+if 'replace("-", "")' not in boundary_test or 'return "mithaq_phase0_$compactUuid"' not in boundary_test:
+    fail("bindIsolatedService instanceName must remove UUID hyphens and use Android's allowed ASCII identifier characters")
+if 'instanceName.matches(Regex("[A-Za-z0-9_.]+"))' not in boundary_test:
+    fail("Isolated-service test must assert the instanceName character contract before calling Android")
+smoke_test = ROOT / "app/src/androidTest/java/com/mithaq/app/InstrumentationSmokeTest.kt"
+if not smoke_test.is_file() or "runnerStartsAndTargetContextIsAvailable" not in smoke_test.read_text():
+    fail("A minimal AndroidJUnitRunner smoke test must run before the Binder tests")
 
 # Emulator workload must be prebuilt before emulator launch. Gradle compilation
 # used to run alongside Android's Package Manager and caused a flaky package
@@ -93,6 +100,12 @@ for required in (
     "--no-streaming",
     "pm list instrumentation",
     "am instrument -w -r",
+    "InstrumentationSmokeTest",
+    "-crash-buffer.txt",
+    "run_instrumentation_case smoke",
+    "run_instrumentation_case isolated",
+    "run_instrumentation_case companion",
+    "dumpsys activity exit-info",
     "MITHAQ_PERMISSION_PROBE_DENIED",
     "capture_diagnostics final-failure",
 ):
@@ -110,3 +123,5 @@ print("- Mithaq package identities and SDK matrix (API 37.0) are pinned")
 print("- AGP 9.3.1 / Gradle 9.7.0 / Kotlin 2.4.21 compatibility pins are explicit")
 print("- English-only v0 / future Arabic / no French recorded")
 print("- Narrow package visibility and explicit isolated-service binding are enforced")
+print("- Isolated-service instance names obey Android's documented ASCII character constraint")
+print("- Instrumentation smoke test and per-case crash diagnostics are mandatory")

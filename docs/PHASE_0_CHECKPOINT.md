@@ -1,9 +1,9 @@
-# Mithaq Phase 0 — Checkpoint 0.1.6
+# Mithaq Phase 0 — Checkpoint 0.1.7
 
 **Date:** 16 November 2026  
 **Baseline:** Product specification r1.5, amended for the selected brand name Mithaq  
-**Checkpoint type:** Repository/security-boundary foundation; emulator runner script-input parsing correction  
-**Status:** Source prepared; hosted Gradle/APK/emulator validation pending
+**Checkpoint type:** Isolated-service API contract fix; instrumentation crash isolation and diagnostics  
+**Status:** Hosted build, package audit, emulator boot, Package Manager readiness and four APK installations passed; instrumentation crash correction prepared and awaiting hosted rerun
 
 ## 1. Product decisions frozen for this checkpoint
 
@@ -32,7 +32,7 @@
 | Negative Binder test | Separate probe APK signed with an ephemeral, unrelated CI certificate attempts to bind and must be denied | `unauthorized-probe/` + emulator workflow (hosted run pending) |
 | Isolation test | Checks isolated UID differs, cannot read host-private marker, lacks Internet permission | `BoundaryInstrumentedTest` |
 | Build checks | Python manifest and product invariants, including explicit removal of AndroidX Core's API<33 receiver-permission fallback | `scripts/` |
-| CI | Unit tests, lint, both debug APKs, prebuilt instrumentation APK, Package Manager readiness gate, direct AndroidJUnitRunner execution, artifact uploads; emulator action invokes its helper as one physical script command | `.github/workflows/ci.yml`, `scripts/run_emulator_boundary_tests.sh` |
+| CI | Unit tests, lint, both debug APKs, prebuilt instrumentation APK, Package Manager readiness gate, instrumentation smoke test, separately launched boundary tests, crash-buffer/exit-info capture, artifact uploads; emulator action invokes its helper as one physical script command | `.github/workflows/ci.yml`, `scripts/run_emulator_boundary_tests.sh` |
 | Release publishing | Signed APK/AAB and checksums uploaded to GitHub Release on `v*.*.*` tags | `publish-release` job |
 
 ## 3. Deliberately not implemented
@@ -59,7 +59,7 @@ A Gradle Wrapper JAR could not be retrieved in this build environment. No fake o
 
 ## 5. Verification status
 
-<badge>Pending hosted CI</badge>
+<badge>Hosted build green — instrumentation validation pending</badge>
 
 | Check | Status | Notes |
 |---|---|---|
@@ -69,7 +69,7 @@ A Gradle Wrapper JAR could not be retrieved in this build environment. No fake o
 | Python workflow pin audit | PASS | `scripts/check_workflow_pins.py`; all third-party action refs use full commit SHAs |
 | Python syntax compile | PASS | All repository Python scripts compile with `py_compile` |
 | CI YAML syntax and structural scan | PASS | Parsed locally; GitHub-hosted execution remains pending |
-| Emulator helper control-flow test | PASS | `scripts/test_emulator_boundary_runner.py` invokes the helper with zero arguments, as CI does, uses fake ADB and injects a transient Package Manager `Broken pipe`; bounded retry and test flow pass |
+| Emulator helper control-flow test | PASS (to be rerun for this checkpoint) | `scripts/test_emulator_boundary_runner.py` invokes the helper with zero arguments, uses fake ADB, injects a transient Package Manager `Broken pipe`, and verifies the smoke + two separate boundary invocations |
 | SDK package invariant | PASS | All three workflow jobs request the exact `platforms;android-37.0` package and verify its `android.jar`; all Android modules pin minor API 0 |
 | Gradle configuration and debug APK assembly | PASS (hosted) | The 16 November run completed with `BUILD SUCCESSFUL`; main, companion and attacker APK assembly completed. The instrumentation APK is now prebuilt in the new pre-emulator step. |
 | Unit tests and lint | PASS (hosted prerequisite job) | The emulator job ran only after `build-test` completed successfully, which requires unit tests, lint, APK assembly and the packaged permission audit. |
@@ -77,7 +77,7 @@ A Gradle Wrapper JAR could not be retrieved in this build environment. No fake o
 | Binder emulator test | Pending hosted execution | APKs are prebuilt before emulator launch; helper validates Package Manager and runs AndroidJUnitRunner directly. Mock ADB harness passes but is not an emulator substitute. |
 | Release signing/upload | Not run | Requires owner-created GitHub secrets and tag |
 
-The initial hosted attempts exposed the API 37 package-name nuance; checkpoint 0.1.2 fixed it. Checkpoint 0.1.3 removed the unused AndroidX Core compatibility permission and retained the exact permission audit. The hosted `build-test` prerequisite subsequently completed, and APK assembly reported `BUILD SUCCESSFUL`; the emulator job then failed at the first package installation with `Failure calling service package: Broken pipe (32)`. This is before the instrumentation tests, so it does not invalidate the successful compilation/assembly but it also provides no Binder-boundary evidence. Checkpoint 0.1.5 moves all APK builds before emulator startup, avoids running Gradle during emulator runtime, waits for Package Manager responsiveness, uses non-streaming installation and directly invokes AndroidJUnitRunner. The next hosted emulator run remains the decisive validation.
+The initial hosted attempts exposed and fixed API 37 SDK package naming, the merged AndroidX permission, companion package visibility, emulator Package Manager transport, and the pinned emulator action's one-line script parsing. The 0.1.6 run then demonstrated that emulator boot, Package Manager readiness, all four APK installations and instrumentation discovery work. It failed only after launching AndroidJUnitRunner, which returned `shortMsg=Process crashed` and no JUnit summary. Source review found the isolated-service test passed a hyphenated UUID to `bindIsolatedService()`, contrary to Android's documented allowed instance-name characters. Checkpoint 0.1.7 removes hyphens, validates the generated identifier, adds a runner smoke test, runs each boundary case separately, and captures per-case crash diagnostics. The next hosted run must confirm instrumentation startup and actual boundary assertions.
 
 ## 6. Play App Signing constraint
 

@@ -31,3 +31,8 @@ Source and manifest audits must pass. The hosted emulator must establish both Bi
 ## Reference
 
 Android Developers, “Declare package visibility needs”: https://developer.android.com/training/package-visibility/declaring (accessed 16 November 2026). The guide instructs apps to declare a package entry for known apps they need to interact with, and notes this enables checking installation and interacting by `bindService()`.
+
+
+## Amendment — Isolated-service instance-name syntax
+
+The `instanceName` argument to `Context.bindIsolatedService()` must contain only ASCII letters, digits, underscores and periods. UUID strings must have hyphens removed before use. Checkpoint 0.1.7 uses `mithaq_phase0_<32 lowercase hexadecimal digits>`. A hyphenated value is invalid and causes `IllegalArgumentException`; see ADR-0010.

@@ -78,11 +78,16 @@ class BoundaryInstrumentedTest {
             }
         }
 
+        val instanceName = isolatedServiceInstanceName()
+        assertTrue(
+            "bindIsolatedService instanceName must contain only ASCII letters, digits, '_' or '.'; got $instanceName",
+            instanceName.matches(Regex("[A-Za-z0-9_.]+")),
+        )
         val intent = Intent().setComponent(component)
         val bound = context.bindIsolatedService(
             intent,
             Context.BIND_AUTO_CREATE,
-            "phase0-isolation-${UUID.randomUUID()}",
+            instanceName,
             context.mainExecutor,
             connection,
         )
@@ -201,6 +206,13 @@ class BoundaryInstrumentedTest {
         } finally {
             context.unbindService(connection)
         }
+    }
+
+    private fun isolatedServiceInstanceName(): String {
+        // Android requires [A-Za-z0-9_.] only. UUID.toString() contains hyphens,
+        // which causes bindIsolatedService() to throw IllegalArgumentException.
+        val compactUuid = UUID.randomUUID().toString().replace("-", "")
+        return "mithaq_phase0_$compactUuid"
     }
 
     private companion object {

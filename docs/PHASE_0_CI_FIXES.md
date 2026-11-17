@@ -145,3 +145,28 @@ The exact pinned `ReactiveCircus/android-emulator-runner` source implements `par
 ### Validation boundary
 
 The source parser behavior is verified against the exact action commit pinned in the workflow. Static checks and the zero-argument fake-ADB regression test validate this correction. The next hosted run must still prove the emulator and Binder boundaries; the current failure occurred before those tests.
+
+
+## 18. Checkpoint 0.1.7 — Instrumentation process crash and invalid isolated-service instance ID
+
+### Hosted evidence
+
+The 0.1.6 run reached the emulator successfully: boot completed, Package Manager was responsive, all four APKs installed, and the instrumentation component was discovered. The first `am instrument` command returned `INSTRUMENTATION_RESULT: shortMsg=Process crashed` and `INSTRUMENTATION_CODE: 0`. The log excerpt did not include the crash-buffer stack trace.
+
+### Confirmed test-code defect
+
+The isolated-service test supplied `phase0-isolation-${UUID.randomUUID()}` to `Context.bindIsolatedService()`. Android's public API permits only ASCII letters, digits, underscores and periods in `instanceName`, and documents `IllegalArgumentException` for invalid identifiers. The Android CTS explicitly treats `test-three` as invalid. The old prefix and UUID both contained hyphens. This is a deterministic misuse of the Android API and a candidate direct cause of the reported instrumentation process termination. Without the crash buffer from the failed run, it would be inaccurate to claim it is proven as the sole cause.
+
+### Fix and diagnosis improvements
+
+- Remove UUID hyphens before passing the instance name.
+- Add an instrumentation smoke test with no Binder operations.
+- Run smoke, isolated-worker and companion Binder test methods in distinct instrumentation processes.
+- Require a JUnit success summary plus `INSTRUMENTATION_CODE: -1` for every invocation.
+- Capture crash buffer, full logcat and ActivityManager process exit information immediately after each invocation.
+- Print fatal exception/native crash excerpts in the Actions log and upload full evidence.
+- Add static checks and fake-ADB coverage for the legal ID and the three instrumentation invocations.
+
+### Acceptance
+
+Do not close Phase 0 until the smoke test, each boundary test and the separately signed attacker-denial probe pass on the hosted API 36 emulator. If any instrumentation process still crashes, inspect its per-case crash-buffer/exit-info artifact rather than applying another speculative change.

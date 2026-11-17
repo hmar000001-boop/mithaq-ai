@@ -10,7 +10,7 @@
 | P0-IPC-01 | Same-publisher IPC | Confirm companion is query-visible, verify same signer and signature permission grant, then bind from main app | Protocol version 1 and challenge echo succeed | Android instrumentation + package/service diagnostics |
 | P0-IPC-02 | Package isolation | Query both service UIDs | Main and companion service UIDs differ | Android instrumentation |
 | P0-IPC-03 | Unauthorized caller | Build a probe APK with an ephemeral CI-generated, unrelated signing certificate; attempt explicit bind | Android rejects binding to the signature-protected Binder service | Emulator CI negative test |
-| P0-INF-01 | Isolated service UID | Verify `ServiceInfo.FLAG_ISOLATED_PROCESS`, then use `bindIsolatedService` with a unique instance name | Worker UID differs from host app UID | Android instrumentation + package/service diagnostics |
+| P0-INF-01 | Isolated service UID | Verify `ServiceInfo.FLAG_ISOLATED_PROCESS`, then use `bindIsolatedService` with an instance name matching `[A-Za-z0-9_.]+` | Worker UID differs from host app UID | Android instrumentation + package/service diagnostics |
 | P0-INF-02 | Private-file isolation | Worker attempts to read host marker | Access denied | Android instrumentation |
 | P0-INF-03 | Permission isolation | Worker checks INTERNET permission | Denied | Android instrumentation |
 | P0-CI-01 | Compile and unit test | Gradle CI tasks | All modules compile and tests pass | GitHub Actions |
@@ -66,3 +66,14 @@ Gradle builds the APKs before emulator launch; the emulator runtime helper does 
 | Action script parsing | Inspect the pinned action's `parseScript()` behavior and statically inspect the workflow `script:` input | One physical command only; do not use YAML multiline block or shell line continuations |
 | CI helper invocation | Run `scripts/run_emulator_boundary_tests.sh` with zero positional arguments and mocked APK/diagnostics paths supplied through environment variables | Helper receives all default paths, then executes the full mocked install/instrumentation/attacker-denial path |
 | Hosted boundary proof | Actual API 36 emulator run | Boot, Package Manager readiness, APK installation, both Binder instrumentation tests and separately signed attacker denial pass |
+
+
+## Instrumentation process startup and failure isolation (checkpoint 0.1.7)
+
+| Check | Method | Required result |
+|---|---|---|
+| Runner smoke | Run `InstrumentationSmokeTest` by itself | One test passes; instrumentation result code is `-1` |
+| Isolated worker | Run only `BoundaryInstrumentedTest#isolatedWorkerHasSeparateUidAndCannotReadHostPrivateFile` | One test passes; legal isolated-service instance name; isolated UID and file/permission boundary verified |
+| Companion Binder | Run only `BoundaryInstrumentedTest#companionBinderIsReachableOnlyThroughTheSignedCompanionContract` | One test passes; same-signer signature grant and Binder challenge round-trip verified |
+| Crash diagnostics | Clear logcat before each invocation; collect `-b crash`, all buffers and `dumpsys activity exit-info` immediately after | Each case produces named diagnostic files; fatal exceptions are surfaced in Actions log |
+| Result contract | Check command exit, crash markers, `INSTRUMENTATION_CODE: -1` and exactly `OK (1 test)` | No generic `Process crashed` result or zero-exit false success is accepted |

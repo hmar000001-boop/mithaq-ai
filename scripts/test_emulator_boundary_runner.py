@@ -43,7 +43,7 @@ if args[:3] == ["shell", "pm", "list"] and len(args) >= 4 and args[3] == "instru
 if args[:3] == ["shell", "am", "instrument"]:
     print("INSTRUMENTATION_RESULT: stream=")
     print("Time: 0.12")
-    print("OK (2 tests)")
+    print("OK (1 test)")
     print("INSTRUMENTATION_CODE: -1")
     raise SystemExit(0)
 if args[:2] == ["logcat", "-c"]:
@@ -119,8 +119,14 @@ def main() -> int:
         if not (diagnostics / "summary.txt").is_file():
             print("Mock run did not create boundary summary", file=sys.stderr)
             return 1
+        expected_runs = {"instrumentation-smoke.txt", "instrumentation-isolated.txt", "instrumentation-companion.txt"}
+        actual_runs = {p.name for p in diagnostics.iterdir()}
+        if not expected_runs.issubset(actual_runs):
+            print("Mock run did not execute smoke + two isolated boundary cases", file=sys.stderr)
+            print(sorted(actual_runs), file=sys.stderr)
+            return 1
 
-    print("Emulator boundary runner mock test: PASS (zero-argument CI invocation and bounded Broken pipe retry)")
+    print("Emulator boundary runner mock test: PASS (zero-argument CI invocation, bounded install retry, isolated smoke/boundary invocations)")
     return 0
 
 
