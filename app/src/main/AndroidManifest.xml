@@ -33,13 +33,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Phase-0 proof service only. It is not the production inference service. -->
-        <service
-            android:name=".probe.IsolatedInferenceProbeService"
-            android:exported="false"
-            android:isolatedProcess="true"
-            android:process=":inference_probe"
-            android:stopWithTask="true" />
     </application>
 </manifest>

@@ -16,5 +16,5 @@ Ship a separately installed Network Companion Android package, signed by the sam
 - The companion has a separate Play Store listing and its own installation/update lifecycle.
 - Main app must detect companion availability, signature/protocol compatibility and degrade safely when it is absent.
 - The companion is still inside the trusted computing base: it can transmit any data explicitly sent to it. Main app must minimize and authorize each request.
-- A signature-level permission prevents differently signed apps from binding to the service, but this checkpoint still needs a negative attacker-app test to prove the denial path empirically.
+- The signature-level permission is declared in the source manifest and is checked by static/host-side integration tests. Runtime denial of a differently signed caller is not proven by this CI suite; do not describe that property as empirically verified until separate device qualification is performed.
 - No generic HTTP proxy or arbitrary URL method may be added.

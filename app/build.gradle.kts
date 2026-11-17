@@ -30,7 +30,6 @@ android {
         targetSdk = 36
         versionCode = providers.gradleProperty("appVersionCode").orElse("1").get().toInt()
         versionName = providers.gradleProperty("appVersion").orElse("0.1.0-dev").get()
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -67,9 +66,6 @@ android {
         }
     }
 
-    testOptions {
-        animationsDisabled = true
-    }
 }
 
 kotlin {
@@ -83,7 +79,6 @@ dependencies {
 
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
-    androidTestImplementation(composeBom)
 
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.material3:material3")
@@ -91,6 +86,4 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    androidTestImplementation("androidx.test:runner:1.7.0")
 }

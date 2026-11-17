@@ -50,4 +50,4 @@ sdkmanager --channel=3 "platforms;android-37.0"
 test -s "$ANDROID_HOME/platforms/android-37.0/android.jar"
 ```
 
-This avoids confusing the API level number with the SDK package identifier and ensures local builds and CI compile against the same API 37.0 surface. API 36 remains the emulator and target SDK baseline for Phase 0. Record the installed `source.properties` revision in CI logs and rerun the build/test matrix if the selected platform package changes.
+This avoids confusing the API level number with the SDK package identifier and ensures local builds and CI compile against the same API 37.0 surface. API 36 remains the target SDK baseline for Phase 0; CI does not create an emulator or require platform-tools. Record the installed `source.properties` revision in CI logs and rerun the build/test matrix if the selected platform package changes.

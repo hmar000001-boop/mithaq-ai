@@ -5,7 +5,7 @@
 
 ## Decision
 
-Every manual source ZIP upload by the owner is followed by GitHub Actions CI. CI runs manifest/invariant scripts, unit tests, lint, debug APK builds, and API 36 emulator boundary tests. A version tag matching `v*.*.*` triggers a signed release build only after those jobs pass.
+Every manual source ZIP upload by the owner is followed by GitHub Actions CI. CI runs manifest/invariant scripts, JVM unit tests, host-JVM integration tests, lint, debug APK builds and packaged permission audits. No emulator or instrumentation stage is used. A version tag matching `v*.*.*` triggers a signed release build only after that single build/test job passes.
 
 The release job uploads main and companion APKs, Android App Bundles and SHA-256 checksums to a GitHub Release. It uses one owner-provided release keystore for both packages because Binder permission relies on matching signatures. Signing material is stored only in GitHub Actions secrets.
 

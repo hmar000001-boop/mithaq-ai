@@ -21,7 +21,7 @@ Reviewed on 16 November 2026. Pin versions in the repository; re-check these sou
 
 ## GitHub Actions release train reviewed for this checkpoint
 
-Every external action in `.github/workflows/ci.yml` is pinned to a full immutable commit SHA. Dependabot checks these pins weekly.
+Every external action in `.github/workflows/ci.yml` is pinned to a full immutable commit SHA. Dependabot checks these pins weekly. The Android emulator runner was removed in checkpoint 0.1.8 because the owner selected host-JVM unit/integration tests only.
 
 | Action | Release | Immutable commit SHA | Release/source |
 |---|---|---|---|
@@ -31,7 +31,6 @@ Every external action in `.github/workflows/ci.yml` is pinned to a full immutabl
 | `gradle/actions/setup-gradle` | v6.4.1 | `8da46b539cd8fe6ab27ca75128919a18d757604c` | https://github.com/gradle/actions/releases/tag/v6.4.1 |
 | `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` | https://github.com/actions/upload-artifact/releases/tag/v7.0.2 |
 | `actions/download-artifact` | v8.0.2 | `9000827ccba6bdab643e8b6fd33ac0654aef8333` | https://github.com/actions/download-artifact/releases/tag/v8.0.2 |
-| `ReactiveCircus/android-emulator-runner` | v2.38.0 | `a421e43855164a8197daf9d8d40fe71c6996bb0d` | https://github.com/ReactiveCircus/android-emulator-runner/releases/tag/v2.38.0 |
 | `softprops/action-gh-release` | v3.0.3 | `efb35369e0ad2afab669f228072c1b0d510eae64` | https://github.com/softprops/action-gh-release/releases/tag/v3.0.3 |
 
 Gradle setup caching is disabled. The `setup-java` v6.3.0 release makes the Java problem matcher opt-in; CI still fails normally on a non-zero Gradle process exit. The signed build uses read-only repository permissions and scopes the signing secrets to the single Gradle build step. A separate job with `contents: write` downloads the prepared assets and publishes the GitHub Release.

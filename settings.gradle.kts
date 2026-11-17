@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Mithaq"
-include(":app", ":network-contract", ":network-companion", ":unauthorized-probe")
+include(":app", ":network-contract", ":network-companion", ":integration-tests")

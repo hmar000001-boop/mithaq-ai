@@ -1,159 +1,111 @@
-# Mithaq Phase 0 — Checkpoint 0.1.7
+# Mithaq Phase 0 — Checkpoint 0.1.8
 
 **Date:** 16 November 2026  
-**Baseline:** Product specification r1.5, amended for the selected brand name Mithaq  
-**Checkpoint type:** Isolated-service API contract fix; instrumentation crash isolation and diagnostics  
-**Status:** Hosted build, package audit, emulator boot, Package Manager readiness and four APK installations passed; instrumentation crash correction prepared and awaiting hosted rerun
+**Baseline:** Product specification r1.6  
+**Checkpoint type:** Retire emulator E2E testing; move CI to JVM unit and host integration tests  
+**Status:** Source/workflow changes prepared; hosted GitHub Actions run pending
 
-## 1. Product decisions frozen for this checkpoint
+## 1. Product decisions retained
 
 - Brand: **Mithaq**.
 - Native Android application, Kotlin-first and Jetpack Compose.
 - v0 language: English only and default. Arabic is planned for a later qualified release; French is excluded.
-- Main app and Network Companion are separate APKs/packages/UIDs.
+- Main app and Network Companion remain separate APKs/packages/UIDs.
 - Main app has no `INTERNET` or `ACCESS_NETWORK_STATE` permission.
-- Companion has only the bounded network permissions required for its future role.
+- Companion has only `INTERNET` and `ACCESS_NETWORK_STATE` for its future bounded role.
 - Companion Binder endpoint is exported only with a signature-level permission.
 - Android min API 35, target API 36, compile API 37.0.
 - JDK 17, AGP 9.3.1, Gradle 9.7.0, Kotlin 2.4.21.
-- Release uploads are manual repository push plus GitHub Actions CI; version tags produce signed APK/AAB assets.
+- Manual repository ZIP upload remains the delivery process. CI builds APKs; version tags build and publish signed APK/AAB release assets.
 
-## 2. Implemented in this checkpoint
+## 2. Decision: remove emulator testing entirely
 
-| Area | Implemented | Evidence in repository |
+The owner explicitly requested that automated CI use only JVM unit tests and host-side integration tests, with no E2E tests on an Android emulator. The emulator stage is therefore removed completely, not merely disabled.
+
+Removed from the project:
+
+- `instrumented-boundary-tests` GitHub Actions job and `ReactiveCircus/android-emulator-runner` action.
+- `app/src/androidTest`, instrumentation manifest, AndroidJUnitRunner configuration and AndroidX test-runner dependencies.
+- Diagnostic-only isolated inference probe service and its test-only AIDL interface from the main APK.
+- `unauthorized-probe` test APK module and ephemeral attacker signing workflow.
+- Emulator ADB runner and mock-ADB regression scripts.
+- Emulator boot, platform-tools and API 36 system-image setup from CI.
+
+No Android runtime behavior is inferred as passed from these removed tests.
+
+## 3. Active automated test strategy
+
+| Layer | What runs | Purpose |
 |---|---|---|
-| Main Android application | Minimal Compose shell and launcher activity | `app/` |
-| Network companion application | Separate Android application, launcher and service | `network-companion/` |
-| Shared IPC contract | Minimal AIDL protocol interface | `network-contract/` |
-| Signature-level Binder protection | Exported companion service requires `com.mithaq.network.permission.BIND_COMPANION` with `protectionLevel=signature` | Companion manifest |
-| Main app least privilege | Requests only the companion signature permission; no network or unused AndroidX legacy receiver permission | Main manifest merger rules + source/APK audits |
-| Isolated process probe | `isolatedProcess=true`, non-exported service | Main manifest + probe service |
-| Positive Binder test | Main app binds companion, round-trips challenge, checks distinct UIDs | `BoundaryInstrumentedTest` |
-| Negative Binder test | Separate probe APK signed with an ephemeral, unrelated CI certificate attempts to bind and must be denied | `unauthorized-probe/` + emulator workflow (hosted run pending) |
-| Isolation test | Checks isolated UID differs, cannot read host-private marker, lacks Internet permission | `BoundaryInstrumentedTest` |
-| Build checks | Python manifest and product invariants, including explicit removal of AndroidX Core's API<33 receiver-permission fallback | `scripts/` |
-| CI | Unit tests, lint, both debug APKs, prebuilt instrumentation APK, Package Manager readiness gate, instrumentation smoke test, separately launched boundary tests, crash-buffer/exit-info capture, artifact uploads; emulator action invokes its helper as one physical script command | `.github/workflows/ci.yml`, `scripts/run_emulator_boundary_tests.sh` |
-| Release publishing | Signed APK/AAB and checksums uploaded to GitHub Release on `v*.*.*` tags | `publish-release` job |
+| JVM unit tests | `:app:testDebugUnitTest`, `:network-contract:testDebugUnitTest`, `:network-companion:testDebugUnitTest` | Test deterministic Kotlin logic without an emulator |
+| Host-JVM integration tests | `:integration-tests:test` | Verify main/companion manifest privilege separation, signature-protected Binder declaration, package visibility and alignment between AIDL methods and service implementation |
+| Static security audits | Manifest boundary, project invariant and action-pin scripts | Detect permission/configuration drift and ensure no emulator E2E stage is reintroduced |
+| Packaged-artifact integration check | AAPT permission audit after APK assembly | Verify the actual debug APK permission sets, not only source manifests |
+| Build/lint | Assemble both debug APKs and run Android lint | Verify both Android applications compile and package |
 
-## 3. Deliberately not implemented
+The host integration suite is deliberately honest about its scope: it does not start Android services or emulate Binder. It cannot prove real cross-UID authorization, process UID separation, private-file denial, `isolatedProcess`, Keystore, SAF or device lifecycle behavior.
+
+## 4. Implemented foundation
+
+| Area | Status | Evidence |
+|---|---|---|
+| Main Android Compose app | Present | `app/` |
+| Separate Network Companion app | Present | `network-companion/` |
+| Shared AIDL contract | Present | `network-contract/` |
+| Signature-level permission declaration | Present in source | Companion manifest + static/host integration checks |
+| Main app least privilege | Present in source and packaged audit | Main manifest + AAPT permission audit |
+| Network Companion least privilege | Present in source and packaged audit | Companion manifest + AAPT permission audit |
+| JVM unit tests | Configured | Android module `src/test` suites |
+| Host-JVM integration tests | Added in this checkpoint | `integration-tests/` |
+| APK CI artifacts | Configured | `.github/workflows/ci.yml` |
+| Tag release workflow | Configured | `release-build` + `publish-release` jobs |
+
+## 5. Explicitly unverified runtime properties
+
+The removed emulator tests had not completed successfully. Therefore the following are **not verified** by this checkpoint:
+
+- successful real Binder round-trip between the installed packages;
+- runtime enforcement of the companion signature permission against a differently signed caller;
+- runtime UID separation and service lifecycle;
+- an isolated inference process being unable to read host-private files or obtain network permissions.
+
+The main app no longer ships the former diagnostic `IsolatedInferenceProbeService`; it was test scaffolding, not the production inference worker. Actual Gemma/embedding/guard worker isolation must be proved as part of the relevant inference implementation gate. Static checks and host tests must not be described as substitutes for that runtime evidence.
+
+## 6. Deliberately not implemented
 
 1. Gemma 4 E4B runtime or model artifact.
 2. Descriptor-based LiteRT-LM JNI bridge.
 3. EmbeddingGemma 2 model integration or vector persistence.
-4. PromptGuard ONNX model export, tokenizer adapter, or score parity.
-5. Search provider client, HTTP client or page-fetch implementation.
+4. PromptGuard ONNX export, exact tokenizer adapter or score parity.
+5. Search provider client, HTTP client or restricted page-fetch implementation.
 6. DNS pinning, SSRF enforcement or HTML extraction.
 7. SQLCipher, Keystore vault, durable memory or RAG schema.
-8. Image inference. Image input remains conditional on the model/runtime/device gate.
-9. Release signing key. It must be created and stored by the repository owner as GitHub Actions secrets.
+8. Image inference.
+9. Release signing key; repository owner must create and store it as GitHub Actions secrets.
 
-The companion AIDL interface is deliberately narrow; it is not a generic HTTP proxy. Future network operations must be added as explicit typed operations with policy and consent contracts.
+## 7. CI pipeline after this checkpoint
 
-## 4. Build-tooling notes
+One normal `build-test` job:
 
-The build pins AGP 9.3.1, Gradle 9.7.0 and Kotlin 2.4.21. AGP 9.3 supports up to compile SDK 37, requires Gradle 9.5.0 or higher and JDK 17. The selected KGP 2.4.21 compatibility table supports AGP through 9.3.1 and Gradle through 9.7.0; both pins are within that fully-supported range. Google Play submissions for new apps and updates must target API 36 or higher from 31 August 2026. [R1–R3]
+1. Install JDK 17, Gradle 9.7.0, API 37.0 compile platform and Build Tools 36.0.0.
+2. Run source manifest, project invariant and GitHub Action SHA-pin audits.
+3. Run all Android module JVM unit tests and `:integration-tests:test`.
+4. Run Android lint on main and companion apps.
+5. Assemble both debug APKs.
+6. Audit packaged APK permissions with AAPT.
+7. Upload debug APKs and test/lint reports.
 
-AGP 9 enables built-in Kotlin by default. This checkpoint opts out with `android.builtInKotlin=false` and `android.newDsl=false` so that Kotlin Gradle Plugin 2.4.21 and the matching Compose compiler plugin are explicitly pinned. This is transitional: the opt-out must be revisited before upgrading to AGP 10, where it is removed. [R4]
+For a `v*.*.*` tag, the signed release job depends only on the successful `build-test` job. The separate publish job creates the GitHub Release and uploads APK, AAB and SHA-256 assets.
 
-A Gradle Wrapper JAR could not be retrieved in this build environment. No fake or incomplete wrapper script is included. GitHub Actions provisions Gradle 9.7.0 directly using `gradle/actions/setup-gradle`; README documents how to generate and commit a standard wrapper after installing Gradle locally.
+## 8. Phase 0 exit criteria
 
-## 5. Verification status
+- Hosted GitHub Actions run passes all JVM unit tests and host-JVM integration tests.
+- Both Android applications pass lint and produce debug APKs.
+- Main/companion packaged permission sets pass the strict AAPT audit.
+- Third-party workflow actions remain pinned to full commit SHAs.
+- Release signing and tag-based publishing are configured and pass when the owner adds secrets.
+- Model/runtime, classifier, restricted-fetch, image and device-resource proofs remain separate technical gates; they are not replaced by the host test strategy.
 
-<badge>Hosted build green — instrumentation validation pending</badge>
+## 9. Verification status for checkpoint 0.1.8
 
-| Check | Status | Notes |
-|---|---|---|
-| XML parse | PASS | All three application manifests parsed successfully |
-| Python manifest audit | PASS | `scripts/check_manifest_boundaries.py` |
-| Python product invariant audit | PASS | `scripts/check_project_invariants.py` |
-| Python workflow pin audit | PASS | `scripts/check_workflow_pins.py`; all third-party action refs use full commit SHAs |
-| Python syntax compile | PASS | All repository Python scripts compile with `py_compile` |
-| CI YAML syntax and structural scan | PASS | Parsed locally; GitHub-hosted execution remains pending |
-| Emulator helper control-flow test | PASS (to be rerun for this checkpoint) | `scripts/test_emulator_boundary_runner.py` invokes the helper with zero arguments, uses fake ADB, injects a transient Package Manager `Broken pipe`, and verifies the smoke + two separate boundary invocations |
-| SDK package invariant | PASS | All three workflow jobs request the exact `platforms;android-37.0` package and verify its `android.jar`; all Android modules pin minor API 0 |
-| Gradle configuration and debug APK assembly | PASS (hosted) | The 16 November run completed with `BUILD SUCCESSFUL`; main, companion and attacker APK assembly completed. The instrumentation APK is now prebuilt in the new pre-emulator step. |
-| Unit tests and lint | PASS (hosted prerequisite job) | The emulator job ran only after `build-test` completed successfully, which requires unit tests, lint, APK assembly and the packaged permission audit. |
-| Main/companion APK builds | PASS (hosted) | Both debug APKs assembled successfully; native-symbol stripping emitted a non-fatal packaging warning for `libandroidx.graphics.path.so`. |
-| Binder emulator test | Pending hosted execution | APKs are prebuilt before emulator launch; helper validates Package Manager and runs AndroidJUnitRunner directly. Mock ADB harness passes but is not an emulator substitute. |
-| Release signing/upload | Not run | Requires owner-created GitHub secrets and tag |
-
-The initial hosted attempts exposed and fixed API 37 SDK package naming, the merged AndroidX permission, companion package visibility, emulator Package Manager transport, and the pinned emulator action's one-line script parsing. The 0.1.6 run then demonstrated that emulator boot, Package Manager readiness, all four APK installations and instrumentation discovery work. It failed only after launching AndroidJUnitRunner, which returned `shortMsg=Process crashed` and no JUnit summary. Source review found the isolated-service test passed a hyphenated UUID to `bindIsolatedService()`, contrary to Android's documented allowed instance-name characters. Checkpoint 0.1.7 removes hyphens, validates the generated identifier, adds a runner smoke test, runs each boundary case separately, and captures per-case crash diagnostics. The next hosted run must confirm instrumentation startup and actual boundary assertions.
-
-## 6. Play App Signing constraint
-
-The main and companion services rely on Android's signature-level Binder permission. Therefore, the APKs installed from Google Play must have the same **Play app-signing certificate**. Matching only the AAB upload-key certificates is insufficient because Play signs the distribution APKs with the app-signing key. For two new Play listings, configure the second listing to use the same app-signing key as the first, or provide a copy of the same app-signing key, before either listing is rolled out to open testing or production. Confirm the certificate fingerprints on Play-generated APKs during internal testing. [R5]
-
-The Phase-0 release workflow currently uses one GitHub Actions keystore to sign GitHub APK assets and AABs. This is a bootstrap arrangement, not the final key-custody recommendation. Before production publishing, decide whether to split the direct-APK app-signing key from the AAB upload key and update the release workflow accordingly. Never mistake the upload key for the Play app-signing key.
-
-## 7. Phase 0 exit criteria
-
-Phase 0 remains open until:
-
-- GitHub Actions successfully compiles both APKs and passes unit tests/lint.
-- The API 36 emulator confirms the network companion Binder round trip under the signature permission and denies the differently signed attacker probe.
-- The isolated service UID differs from the host UID and cannot read the host app's private marker file.
-- The isolated service reports no Internet permission.
-- Play Console signing configuration is documented before either companion listing is released; both Play-delivered packages use the same app-signing certificate.
-- Merged-manifest inspection confirms main app has no network permission and companion has only its expected permissions.
-- Gemma FD-loading proof, embedding proof, classifier export/parity, URL-fetch proof and resource benchmarks are delivered as separate technical reports or explicit blockers.
-
-## 8. Next work within Phase 0
-
-1. Upload checkpoint 0.1.5 and rerun GitHub Actions; confirm packaged APK permission audits pass and the Package Manager/install gate succeeds.
-2. Confirm both AndroidJUnitRunner boundary tests and the differently signed attacker test pass; retain uploaded diagnostics if any step fails.
-3. Run LiteRT-LM Gemma 4 E4B raw-FD proof on a physical Android 16/API 36 device.
-4. Run EmbeddingGemma text-only inference proof, verify exact model artifact/tokenizer/template and output dimensions.
-5. Export PromptGuard 2 86M to ONNX, integrate the exact tokenizer and compare Android logits against reference Transformers results.
-6. Implement and test the separate-package companion protocol version/signature lifecycle.
-7. Prototype secure HTTP fetch with DNS-to-socket pinning and strict redirect enforcement; no live product tool until the gate passes.
-8. Produce measured peak-memory/thermal evidence for 8 GB and 12 GB reference devices.
-
-## 9. References
-
-- R1 — Android Gradle Plugin 9.3 release notes: https://developer.android.com/build/releases/agp-9-3-0-release-notes
-- R2 — Gradle 9.7.0 release notes: https://docs.gradle.org/9.7.0/release-notes.html
-- R6 — Kotlin Gradle Plugin 2.4.21 compatibility matrix: https://kotlinlang.org/docs/gradle-configure-project.html
-- R3 — Google Play target API requirements: https://support.google.com/googleplay/android-developer/answer/11926878
-- R4 — AGP 9 built-in Kotlin and migration guidance: https://developer.android.com/build/migrate-to-built-in-kotlin
-- R5 — Google Play App Signing, including the option to use the same app-signing key for multiple listings before rollout: https://support.google.com/googleplay/android-developer/answer/9842756
-- R7 — Set up the Android 17 SDK; documents compileSdk 37 and the Android 17 SDK package: https://developer.android.com/about/versions/17/setup-sdk
-- R8 — AGP CompileSdkSpec; documents `release(37) { minorApiLevel = 0 }`: https://developer.android.com/reference/tools/gradle-api/9.3/com/android/build/api/dsl/CompileSdkSpec
-- R9 — GitHub Actions runner-image issue confirming API 37.0 package ID and `android-37.0` install path: https://github.com/actions/runner-images/issues/13859
-- R10 — AndroidX Core source: its receiver-registration compatibility permission is only checked below API 33; API 33+ delegates to the platform overload: https://android.googlesource.com/platform/frameworks/support/+/4d0b56080497b79e6ac3d1b3b87f1029edf9c3c7/core/core/src/main/java/androidx/core/content/ContextCompat.java
-- R11 — Android security guide: the generated receiver permission is required when `minSdk < 33`, not when the supported baseline is API 35: https://developer.android.com/agents/skills/security/android-intent-security/skill
-- R8 — SDK Manager channel options (0 stable, 1 beta, 2 dev, 3 canary): https://developer.android.com/tools/sdkmanager
-
-## Binder connection failure investigation and correction (checkpoint 0.1.4)
-
-**Reported run:** 2026-11-16T20:44Z (after APK permission audit passed)  
-**Affected tests:** isolated inference probe and signed network companion Binder round trip.
-
-### Findings
-
-The hosted APKs compiled and packaged, and the strict packaged-permission audit advanced beyond its previous failure. Both instrumentation tests then timed out while waiting for `ServiceConnection.onServiceConnected`. The separate companion package was not declared in the main app's `<queries>` list. On Android 11+ package visibility filtering affects discovery and interaction with other apps; Android's own guide explicitly calls out bound-service integration as a reason to add a package entry. The main app now lists only `com.mithaq.network` and `com.mithaq.network.debug`, rather than requesting `QUERY_ALL_PACKAGES`.
-
-The isolated worker was already declared `isolatedProcess=true` and non-exported. Its test now uses the API's dedicated `bindIsolatedService()` path and a unique instance name, after verifying the installed ServiceInfo flags and process name. Both tests record `onNullBinding`, `onBindingDied`, and `onServiceDisconnected`, include permission/UID/process context in failures, and allow a 30-second cold-start window. The test service logs its `onCreate` and `onBind` events.
-
-### CI diagnostics
-
-The emulator job clears logcat before the boundary tests. If instrumentation fails, it captures logcat, main/companion package metadata, and ActivityManager service state to an artifact. This is intended to distinguish missing package visibility, permission denial, component resolution, service-process crash, null binding, and slow cold start on the next run.
-
-### Separate cleanup warning
-
-The reported `/sdcard/Android/media/com.mithaq.app.debug/additional_test_output` removal denial came from the Android test-output collection path and appeared before the JUnit failures. The test runner continued and reported two actual assertion failures. It is not treated as the cause of either Binder timeout. The next CI run will preserve service/process logcat so this remains independently diagnosable if it persists.
-
-### Verification status
-
-- Main manifest declares only the release/debug companion package visibility; no broad package visibility permission is introduced.
-- Source test code validates companion metadata, signature permission grant, matching signing certificates, isolated service flags, unique isolated binding and terminal callbacks.
-- Static checks and archive integrity: to be rerun before delivery.
-- Gradle compilation, Android manifest merge, Binder callbacks, UID separation, private-file denial and different-signer denial: pending the next hosted Android 36 emulator run. This checkpoint is a source-level correction and diagnostic improvement, not a claim that emulator tests have passed.
-
-
-## 0.1.6 — ReactiveCircus script parser compatibility
-
-The first 0.1.5 hosted rerun exited with code 64 before the helper reached Android boot checks. The helper reported its usage because it received zero positional arguments. The pinned `ReactiveCircus/android-emulator-runner` action splits its `script:` input on physical newlines and executes each resulting line as a separate `sh -c` command. Consequently, YAML's multi-line Bash command with backslash continuations did not behave like a normal shell script.
-
-Checkpoint 0.1.6 changes the action's `script:` input to the single physical command `bash scripts/run_emulator_boundary_tests.sh`. The helper now supports zero arguments and derives the four APK paths from the repository workspace plus its diagnostics directory from `RUNNER_TEMP`; its five-argument mode remains available for local/manual use. The mock-ADB test now executes the zero-argument path, and the invariant checker rejects any regression to a multiline command in this action input.
-
-This resolves the observed usage/exit-64 failure at source level. It does not prove Android boot, package installation, Binder connection, isolated UID or attacker denial: those remain pending the next hosted emulator run.
+The source ZIP has been updated and static checks are being run in the authoring environment. No claim is made that the new Gradle/JVM integration module has compiled or that GitHub-hosted CI has passed. Hosted verification is required after the owner uploads this checkpoint.
